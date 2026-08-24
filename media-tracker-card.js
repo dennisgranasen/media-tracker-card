@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.1";
+const CARD_VERSION = "0.7.2";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -22,6 +22,8 @@ class MediaTrackerCard extends HTMLElement {
       mood_filter: "all",
       ...config,
     };
+
+    this._optimisticHidden = this._optimisticHidden || new Set();
 
     this._runtimeFilters = {
       provider_filter: this._config.provider_filter,
@@ -146,6 +148,22 @@ class MediaTrackerCard extends HTMLElement {
     const items = this._state()?.attributes?.items;
     if (!Array.isArray(items)) return [];
 
+    // Once Home Assistant confirms that an item is gone from this feed,
+    // the optimistic suppression entry is no longer needed.
+    if (this._optimisticHidden?.size) {
+      const present = new Set(
+        items.map(
+          (item) =>
+            `${item?.media_type || "movie"}:${item?.tmdb_id}`,
+        ),
+      );
+      for (const key of [...this._optimisticHidden]) {
+        if (!present.has(key)) {
+          this._optimisticHidden.delete(key);
+        }
+      }
+    }
+
     const runtime = this._runtimeFilters || this._config;
 
     const providerFilter = String(
@@ -187,6 +205,11 @@ class MediaTrackerCard extends HTMLElement {
     };
 
     const filtered = items.filter((item) => {
+      const optimisticKey = `${item?.media_type || "movie"}:${item?.tmdb_id}`;
+      if (this._optimisticHidden?.has(optimisticKey)) {
+        return false;
+      }
+
       if (
         providerFilter === "my" &&
         item?.available_on_my_services !== true
@@ -306,6 +329,20 @@ class MediaTrackerCard extends HTMLElement {
   async _call(service, data) {
     if (!this._hass) return;
     await this._hass.callService("media_watch", service, data);
+  }
+
+  _optimisticKey(item) {
+    return `${item?.media_type || "movie"}:${item?.tmdb_id}`;
+  }
+
+  _shouldOptimisticallyHide(action) {
+    return [
+      "episode-watched",
+      "season-watched",
+      "movie-watched",
+      "watchlist",
+      "dismiss",
+    ].includes(action);
   }
 
   async _action(event, item, action) {
@@ -521,7 +558,29 @@ class MediaTrackerCard extends HTMLElement {
           event.stopPropagation();
           this._open(event, item);
         } else {
-          await this._action(event, item, button.dataset.action);
+          const action = button.dataset.action;
+          const optimistic = this._shouldOptimisticallyHide(action);
+          const key = this._optimisticKey(item);
+
+          if (optimistic) {
+            this._optimisticHidden.add(key);
+            this._render();
+          }
+
+          try {
+            await this._action(event, item, action);
+          } catch (error) {
+            if (optimistic) {
+              this._optimisticHidden.delete(key);
+              this._render();
+            }
+            console.error(
+              "Media Tracker action failed",
+              action,
+              item,
+              error,
+            );
+          }
         }
       });
     });

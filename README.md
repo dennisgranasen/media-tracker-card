@@ -246,3 +246,19 @@ Mood presets now use TMDB genre IDs instead of localized genre names. This
 makes interactive mood filtering independent of the TMDB profile language.
 
 Movie and TV feeds use their respective TMDB genre taxonomies.
+
+
+### v0.7.2 optimistic actions
+
+Actions that normally remove an item from the current feed update the card
+immediately:
+
+- episode watched
+- season watched
+- movie/TV watched
+- add discovery/personalized item to watchlist
+- dismiss
+
+The Home Assistant service call then runs normally. If it fails, the item is
+restored in the card. This avoids making the UI wait for a full Media Watch
+coordinator refresh.
