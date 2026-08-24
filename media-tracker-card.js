@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.7.0";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -14,7 +14,21 @@ class MediaTrackerCard extends HTMLElement {
       provider_icon_size: 26,
       date_format: "short",
       hide_empty: false,
+      provider_filter: "all",
+      include_genres: [],
+      exclude_genres: [],
+      genre_match: "any",
+      show_filters: false,
+      mood_filter: "all",
       ...config,
+    };
+
+    this._runtimeFilters = {
+      provider_filter: this._config.provider_filter,
+      mood_filter: this._config.mood_filter,
+      include_genres: [...(this._config.include_genres || [])],
+      exclude_genres: [...(this._config.exclude_genres || [])],
+      genre_match: this._config.genre_match,
     };
 
     this._render();
@@ -41,11 +55,127 @@ class MediaTrackerCard extends HTMLElement {
     return this._hass?.states?.[this._config?.entity] || null;
   }
 
+  _moodPreset(name) {
+    const moods = {
+      all: { include: [], exclude: [], min_rating: null },
+      feelgood: {
+        include: ["Comedy", "Family", "Romance"],
+        exclude: ["Horror"],
+        min_rating: 6.0,
+      },
+      exciting: {
+        include: ["Action", "Adventure", "Thriller"],
+        exclude: [],
+        min_rating: 6.0,
+      },
+      dark: {
+        include: ["Crime", "Thriller", "Mystery", "Horror"],
+        exclude: ["Family"],
+        min_rating: 6.2,
+      },
+      family: {
+        include: ["Family", "Animation", "Adventure", "Comedy"],
+        exclude: ["Horror"],
+        min_rating: 5.8,
+      },
+      romance: {
+        include: ["Romance", "Comedy", "Drama"],
+        exclude: ["Horror"],
+        min_rating: 6.0,
+      },
+      scifi_fantasy: {
+        include: ["Science Fiction", "Fantasy", "Adventure"],
+        exclude: [],
+        min_rating: 6.2,
+      },
+      serious: {
+        include: ["Drama", "History", "War"],
+        exclude: ["Comedy"],
+        min_rating: 6.5,
+      },
+    };
+    return moods[name] || moods.all;
+  }
+
   _items() {
     const items = this._state()?.attributes?.items;
-    return Array.isArray(items)
-      ? items.slice(0, Math.max(1, Number(this._config.max || 10)))
-      : [];
+    if (!Array.isArray(items)) return [];
+
+    const runtime = this._runtimeFilters || this._config;
+
+    const providerFilter = String(
+      runtime.provider_filter || "all",
+    ).toLowerCase();
+
+    const normalize = (values) =>
+      (Array.isArray(values) ? values : [values])
+        .filter((value) => value !== null && value !== undefined && value !== "")
+        .map((value) => String(value).trim().toLowerCase());
+
+    const configuredInclude = normalize(runtime.include_genres || []);
+    const configuredExclude = normalize(runtime.exclude_genres || []);
+    const genreMatch = String(runtime.genre_match || "any").toLowerCase();
+
+    const mood = this._moodPreset(
+      String(runtime.mood_filter || "all").toLowerCase(),
+    );
+    const moodInclude = normalize(mood.include || []);
+    const moodExclude = normalize(mood.exclude || []);
+
+    const includeGenres = [...new Set([...configuredInclude, ...moodInclude])];
+    const excludeGenres = [...new Set([...configuredExclude, ...moodExclude])];
+
+    const matchesGenreToken = (item, token) => {
+      const ids = Array.isArray(item.genre_ids)
+        ? item.genre_ids.map((id) => String(id).toLowerCase())
+        : [];
+      const names = Array.isArray(item.genres)
+        ? item.genres
+            .map((genre) => String(genre?.name || "").trim().toLowerCase())
+            .filter(Boolean)
+        : [];
+      return ids.includes(token) || names.includes(token);
+    };
+
+    const filtered = items.filter((item) => {
+      if (
+        providerFilter === "my" &&
+        item?.available_on_my_services !== true
+      ) {
+        return false;
+      }
+
+      if (
+        mood.min_rating != null &&
+        Number(item?.vote_average || 0) < Number(mood.min_rating)
+      ) {
+        return false;
+      }
+
+      if (
+        excludeGenres.some((token) => matchesGenreToken(item, token))
+      ) {
+        return false;
+      }
+
+      if (includeGenres.length) {
+        const checks = includeGenres.map((token) =>
+          matchesGenreToken(item, token),
+        );
+        const included =
+          genreMatch === "all"
+            ? checks.every(Boolean)
+            : checks.some(Boolean);
+        if (!included) return false;
+      }
+
+      return true;
+    });
+
+    return filtered.slice(
+      0,
+      Math.max(1, Number(this._config.max || 10)),
+    );
   }
 
   _formatDate(value) {
@@ -156,7 +286,7 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "movie-watched") {
       await this._call("mark_watched", {
-        media_type: "movie",
+        media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
       });
       return;
@@ -164,7 +294,7 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "watchlist") {
       await this._call("follow", {
-        media_type: "movie",
+        media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
       });
       return;
@@ -172,7 +302,7 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "dismiss") {
       await this._call("dismiss", {
-        media_type: "movie",
+        media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
       });
     }
@@ -207,14 +337,69 @@ class MediaTrackerCard extends HTMLElement {
     return parts.join(" · ");
   }
 
+  _awardBadge(item) {
+    const award = item?.award;
+    if (!award || item.source !== "oscars") return "";
+
+    if (award.winner) {
+      return `
+        <span class="award-badge winner">
+          <ha-icon icon="mdi:trophy-award"></ha-icon>
+          Vinnare
+        </span>
+      `;
+    }
+
+    return `
+      <span class="award-badge">
+        <ha-icon icon="mdi:medal-outline"></ha-icon>
+        Nominerad
+      </span>
+    `;
+  }
+
   _actions(item, index) {
-    if (item.source === "episodes" || item.media_type === "tv") {
+    if (item.source === "episodes") {
       return `
         <button class="action primary" data-action="episode-watched" data-index="${index}">
           <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
         </button>
         <button class="action" data-action="season-watched" data-index="${index}">
           <ha-icon icon="mdi:check-all"></ha-icon><span>Säsong</span>
+        </button>
+      `;
+    }
+
+    if (item.source === "oscars") {
+      const watchlistAction = item.on_watchlist
+        ? ""
+        : `
+          <button class="action primary" data-action="watchlist" data-index="${index}">
+            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+          </button>
+        `;
+
+      return `
+        ${watchlistAction}
+        <button class="action ${item.on_watchlist ? "primary" : ""}" data-action="movie-watched" data-index="${index}">
+          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        </button>
+        <button class="action" data-action="dismiss" data-index="${index}">
+          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+        </button>
+      `;
+    }
+
+    if (item.source === "personalized") {
+      return `
+        <button class="action primary" data-action="watchlist" data-index="${index}">
+          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+        </button>
+        <button class="action" data-action="movie-watched" data-index="${index}">
+          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        </button>
+        <button class="action" data-action="dismiss" data-index="${index}">
+          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
         </button>
       `;
     }
@@ -264,6 +449,7 @@ class MediaTrackerCard extends HTMLElement {
             <div class="date">${this._escape(rightMeta)}</div>
           </div>
           <div class="subtitle">${this._escape(subtitle)}</div>
+          ${this._awardBadge(item)}
           <div class="providers">${this._providers(item)}</div>
           <div class="actions">
             ${this._actions(item, index)}
@@ -299,6 +485,64 @@ class MediaTrackerCard extends HTMLElement {
     });
   }
 
+  _filterBar() {
+    if (!this._config.show_filters) return "";
+
+    const runtime = this._runtimeFilters || this._config;
+    const mood = runtime.mood_filter || "all";
+    const provider = runtime.provider_filter || "all";
+
+    const moods = [
+      ["all", "Alla"],
+      ["feelgood", "Feel-good"],
+      ["exciting", "Spännande"],
+      ["dark", "Mörkt"],
+      ["family", "Familj"],
+      ["romance", "Romantik"],
+      ["scifi_fantasy", "Sci-Fi/Fantasy"],
+      ["serious", "Seriöst"],
+    ];
+
+    return `
+      <div class="filters">
+        <label class="filter-field">
+          <span>Humör</span>
+          <select data-filter="mood_filter">
+            ${moods
+              .map(
+                ([value, label]) =>
+                  `<option value="${value}" ${value === mood ? "selected" : ""}>${label}</option>`,
+              )
+              .join("")}
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span>Tjänster</span>
+          <select data-filter="provider_filter">
+            <option value="all" ${provider === "all" ? "selected" : ""}>Alla</option>
+            <option value="my" ${provider === "my" ? "selected" : ""}>Mina</option>
+          </select>
+        </label>
+      </div>
+    `;
+  }
+
+  _wireFilters() {
+    if (!this._config.show_filters) return;
+
+    this.querySelectorAll("[data-filter]").forEach((control) => {
+      control.addEventListener("change", () => {
+        const key = control.dataset.filter;
+        this._runtimeFilters = {
+          ...(this._runtimeFilters || {}),
+          [key]: control.value,
+        };
+        this._render();
+      });
+    });
+  }
+
   _render() {
     if (!this._config) return;
 
@@ -323,6 +567,28 @@ class MediaTrackerCard extends HTMLElement {
           }
           .header-title { font-size:1.15rem; font-weight:600; }
           .count { color:var(--secondary-text-color); font-size:.85rem; }
+          .filters {
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            padding:0 16px 12px;
+          }
+          .filter-field {
+            display:flex;
+            align-items:center;
+            gap:6px;
+            color:var(--secondary-text-color);
+            font-size:.8rem;
+          }
+          .filter-field select {
+            min-height:36px;
+            border:1px solid var(--divider-color);
+            border-radius:8px;
+            padding:0 9px;
+            background:var(--card-background-color);
+            color:var(--primary-text-color);
+            font:inherit;
+          }
           .media-item {
             display:grid;
             grid-template-columns:92px minmax(0,1fr);
@@ -356,6 +622,22 @@ class MediaTrackerCard extends HTMLElement {
             font-size:.9rem;white-space:nowrap;overflow:hidden;
             text-overflow:ellipsis;
           }
+          .award-badge {
+            width:max-content;
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            padding:3px 7px;
+            border-radius:999px;
+            background:var(--secondary-background-color);
+            color:var(--secondary-text-color);
+            font-size:.75rem;
+          }
+          .award-badge.winner {
+            color:var(--primary-text-color);
+            font-weight:600;
+          }
+          .award-badge ha-icon { --mdc-icon-size:15px; }
           .providers {
             min-height:30px;display:flex;align-items:center;
             flex-wrap:wrap;gap:7px;
@@ -407,6 +689,8 @@ class MediaTrackerCard extends HTMLElement {
             : ""
         }
 
+        ${this._filterBar()}
+
         ${
           !state
             ? `<div class="error">Entity ${this._escape(this._config.entity)} hittades inte.</div>`
@@ -418,6 +702,7 @@ class MediaTrackerCard extends HTMLElement {
     `;
 
     if (state && items.length) this._wire(items);
+    this._wireFilters();
   }
 }
 

@@ -3,7 +3,7 @@
 A generic Lovelace card for
 [`home-assistant-media-tracker`](https://github.com/dennisgranasen/home-assistant-media-tracker).
 
-Requires backend **v0.7.0+**.
+Requires backend **v0.11.0+**.
 
 Each card reads one entity with one `items` attribute. Use as many or as few
 cards as you want.
@@ -23,11 +23,23 @@ season is already scheduled.
 
 ## Watchlist
 
+Show the complete TMDB movie watchlist:
+
 ```yaml
 type: custom:media-tracker-card
 entity: sensor.media_watch_watchlist
 title: Watchlist
-max: 10
+provider_filter: all
+```
+
+Show only watchlist movies currently available on one of your selected
+streaming services:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_watchlist
+title: Watchlist på mina tjänster
+provider_filter: my
 ```
 
 The **Sedd** action marks the movie watched and removes it from the TMDB
@@ -35,11 +47,25 @@ watchlist.
 
 ## Discovery
 
+All discovery results available on streaming services in your configured
+region:
+
 ```yaml
 type: custom:media-tracker-card
 entity: sensor.media_watch_discovery
 title: Filmtips
-max: 10
+provider_filter: all
+max: 20
+```
+
+Only discoveries available on your selected services:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_discovery
+title: Filmtips på mina tjänster
+provider_filter: my
+max: 20
 ```
 
 Discovery provides:
@@ -48,6 +74,16 @@ Discovery provides:
   disappears from Discovery and appears in Watchlist.
 - **Sedd**
 - **Dölj**
+
+## Provider filter
+
+`provider_filter` supports:
+
+- `all` — do not filter the feed by your subscriptions.
+- `my` — require `available_on_my_services: true`.
+
+The filter only changes what the card displays. It does not alter the TMDB
+watchlist or your selected provider settings.
 
 ## Shared options
 
@@ -62,3 +98,143 @@ Provider logos come from TMDB watch-provider metadata.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 Watch-provider metadata is powered by JustWatch.
+
+
+## Oscars
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_oscars
+title: Oscars
+provider_filter: all
+max: 10
+```
+
+Or only Oscar films currently available on one of your services:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_oscars
+title: Oscars på mina tjänster
+provider_filter: my
+max: 10
+```
+
+The latest Best Picture winner is shown with a **Vinnare** badge; the remaining
+Best Picture films show **Nominerad**.
+
+Oscar feed actions:
+
+- **Watchlist** (unless already on your TMDB watchlist)
+- **Sedd**
+- **Dölj**
+
+
+## Genre filtering
+
+Genre filters work on discovery and personalized feeds for both movies and TV.
+
+Include one or more genres by localized TMDB name:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_discovery
+title: Sci-fi och fantasy
+include_genres:
+  - Science Fiction
+  - Fantasy
+genre_match: any
+```
+
+Or by TMDB genre IDs:
+
+```yaml
+include_genres:
+  - 878
+  - 14
+genre_match: any
+```
+
+Exclude genres:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_discovery
+title: Filmtips utan skräck
+exclude_genres:
+  - Horror
+```
+
+`genre_match: all` requires every included genre; `any` (default) requires at
+least one. Exclusion always wins.
+
+## Personalized movies
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_personalized_movies
+title: För dig
+provider_filter: my
+max: 20
+```
+
+This feed aggregates TMDB recommendations from both your current movie
+watchlist and movies marked watched in Media Watch.
+
+## TV discovery
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_discovery_tv
+title: Serietips
+provider_filter: my
+max: 20
+```
+
+The same rating/provider model used for general movie discovery is applied to
+TV shows.
+
+## Personalized TV
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_personalized_tv
+title: Serier för dig
+provider_filter: my
+max: 20
+```
+
+Seeds are followed/watchlisted TV shows plus shows marked watched locally.
+
+
+## Interactive mood filters
+
+Set:
+
+```yaml
+show_filters: true
+```
+
+to expose interactive filters directly in the card:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_discovery
+title: Vad ska vi se?
+show_filters: true
+provider_filter: my
+max: 20
+```
+
+The user can then change:
+
+- **Humör**: Alla, Feel-good, Spännande, Mörkt, Familj, Romantik,
+  Sci-Fi/Fantasy, Seriöst
+- **Tjänster**: Alla or Mina
+
+Mood presets combine genre inclusion/exclusion with a small rating floor.
+They are applied on top of any static YAML `include_genres` /
+`exclude_genres`.
+
+The filter state is local to the rendered card and is not persisted to Home
+Assistant. Reloading the dashboard resets it to the YAML defaults.
