@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.7.1";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -55,46 +55,91 @@ class MediaTrackerCard extends HTMLElement {
     return this._hass?.states?.[this._config?.entity] || null;
   }
 
-  _moodPreset(name) {
-    const moods = {
+  _moodPreset(name, mediaType = "movie") {
+    // Use TMDB genre IDs rather than localized genre names.
+    // Movie and TV genre taxonomies are similar but not identical.
+    const movie = {
       all: { include: [], exclude: [], min_rating: null },
       feelgood: {
-        include: ["Comedy", "Family", "Romance"],
-        exclude: ["Horror"],
+        include: ["35", "10751", "10749"],
+        exclude: ["27"],
         min_rating: 6.0,
       },
       exciting: {
-        include: ["Action", "Adventure", "Thriller"],
+        include: ["28", "12", "53"],
         exclude: [],
         min_rating: 6.0,
       },
       dark: {
-        include: ["Crime", "Thriller", "Mystery", "Horror"],
-        exclude: ["Family"],
+        include: ["80", "53", "9648", "27"],
+        exclude: ["10751"],
         min_rating: 6.2,
       },
       family: {
-        include: ["Family", "Animation", "Adventure", "Comedy"],
-        exclude: ["Horror"],
+        include: ["10751", "16", "12", "35"],
+        exclude: ["27"],
         min_rating: 5.8,
       },
       romance: {
-        include: ["Romance", "Comedy", "Drama"],
-        exclude: ["Horror"],
+        include: ["10749", "35", "18"],
+        exclude: ["27"],
         min_rating: 6.0,
       },
       scifi_fantasy: {
-        include: ["Science Fiction", "Fantasy", "Adventure"],
+        include: ["878", "14", "12"],
         exclude: [],
         min_rating: 6.2,
       },
       serious: {
-        include: ["Drama", "History", "War"],
-        exclude: ["Comedy"],
+        include: ["18", "36", "10752"],
+        exclude: ["35"],
         min_rating: 6.5,
       },
     };
-    return moods[name] || moods.all;
+
+    const tv = {
+      all: { include: [], exclude: [], min_rating: null },
+      feelgood: {
+        include: ["35", "10751"],
+        exclude: ["9648"],
+        min_rating: 6.0,
+      },
+      exciting: {
+        include: ["10759", "9648"],
+        exclude: [],
+        min_rating: 6.0,
+      },
+      dark: {
+        include: ["80", "9648", "18"],
+        exclude: ["10751"],
+        min_rating: 6.2,
+      },
+      family: {
+        include: ["10751", "16", "35"],
+        exclude: [],
+        min_rating: 5.8,
+      },
+      romance: {
+        // TMDB TV has no dedicated Romance genre; Drama/Comedy is the
+        // closest general-purpose approximation for a mood preset.
+        include: ["18", "35"],
+        exclude: [],
+        min_rating: 6.0,
+      },
+      scifi_fantasy: {
+        include: ["10765", "10759"],
+        exclude: [],
+        min_rating: 6.2,
+      },
+      serious: {
+        include: ["18", "10768"],
+        exclude: ["35"],
+        min_rating: 6.5,
+      },
+    };
+
+    const presets = mediaType === "tv" ? tv : movie;
+    return presets[name] || presets.all;
   }
 
   _items() {
@@ -116,8 +161,12 @@ class MediaTrackerCard extends HTMLElement {
     const configuredExclude = normalize(runtime.exclude_genres || []);
     const genreMatch = String(runtime.genre_match || "any").toLowerCase();
 
+    const mediaType =
+      items.find((item) => item?.media_type)?.media_type || "movie";
+
     const mood = this._moodPreset(
       String(runtime.mood_filter || "all").toLowerCase(),
+      mediaType,
     );
     const moodInclude = normalize(mood.include || []);
     const moodExclude = normalize(mood.exclude || []);

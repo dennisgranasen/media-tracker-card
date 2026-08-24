@@ -238,3 +238,11 @@ They are applied on top of any static YAML `include_genres` /
 
 The filter state is local to the rendered card and is not persisted to Home
 Assistant. Reloading the dashboard resets it to the YAML defaults.
+
+
+### v0.7.1 mood filter fix
+
+Mood presets now use TMDB genre IDs instead of localized genre names. This
+makes interactive mood filtering independent of the TMDB profile language.
+
+Movie and TV feeds use their respective TMDB genre taxonomies.
