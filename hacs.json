@@ -1,5 +1,5 @@
 {
-    "name": "Upcoming Media Card",
-    "content_in_root": true,
-    "filename": "upcoming-media-card.js"
+  "name": "Media Tracker Card",
+  "filename": "media-tracker-card.js",
+  "render_readme": true
 }
