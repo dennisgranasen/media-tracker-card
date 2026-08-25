@@ -336,3 +336,11 @@ limits its width responsively on narrow screens.
 
 Watchlist rows have a separate **Ta bort** action that calls
 `media_watch.unfollow` without changing the movie's local watched state.
+
+
+### v0.7.10 award-specific symbols
+
+- Oscars use a stylized statuette, Cannes uses a golden palm and Guldbaggen
+  uses a golden beetle instead of sharing one generic trophy.
+- Profiles containing several award organizations render one badge per source,
+  so an Oscar nomination cannot be confused with a Guldbagge win.

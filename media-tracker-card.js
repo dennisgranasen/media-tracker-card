@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.9";
+const CARD_VERSION = "0.7.10";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -505,6 +505,7 @@ class MediaTrackerCard extends HTMLElement {
         wins.set(this._personKey(win.name), {
           ...win,
           organization: award.organization || award.source || "Award",
+          source: award.source,
         });
       }
     }
@@ -523,10 +524,10 @@ class MediaTrackerCard extends HTMLElement {
         : /emmy/i.test(organization)
           ? "Emmy"
           : organization;
-      const title = this._escape(`${awardName}: ${
+      const title = `${awardName}: ${
         win.category || (win.role === "directing" ? "regi" : "skådespeleri")
-      }`);
-      return `<span class="award-person">${escapedName}<ha-icon class="credit-award" icon="mdi:trophy-award" title="${title}"></ha-icon></span>`;
+      }`;
+      return `<span class="award-person">${escapedName}${this._awardSymbol(win, true, title, "credit-award")}</span>`;
     }).join(", ");
   }
 
@@ -557,21 +558,72 @@ class MediaTrackerCard extends HTMLElement {
     return lines.join("");
   }
 
-  _awardBadge(item) {
-    const award = item?.award;
-    if (!award) return "";
-
+  _awardKind(award, item = {}) {
     const organization = String(award.organization || "").toLowerCase();
-    const isOscar =
+    const source = String(award.source || "").toLowerCase();
+    if (
       item.source === "oscars" ||
-      award.source === "oscars" ||
+      source === "oscars" ||
       organization.includes("academy awards") ||
-      organization.includes("oscar");
+      organization.includes("oscar")
+    ) return "oscar";
+    if (source === "guldbaggen" || organization.includes("guldbagge")) {
+      return "guldbagge";
+    }
+    if (source === "cannes" || organization.includes("cannes")) {
+      return "palme";
+    }
+    return "generic";
+  }
+
+  _awardSymbol(award, winner, title = "", extraClass = "", item = {}) {
+    const kind = this._awardKind(award, item);
+    const classes = `award-symbol ${kind} ${extraClass}`.trim();
+    const titleAttr = title ? ` title="${this._escape(title)}"` : "";
+
+    if (kind === "oscar") {
+      return `<span class="${classes}"${titleAttr} aria-label="Oscar">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="4" r="2.25"></circle>
+          <path d="M9.8 7h4.4l1.5 7.7-2.2 3.1h-3l-2.2-3.1L9.8 7Z"></path>
+          <path d="M8.5 19h7v2h-7zM7.5 21h9v2h-9z"></path>
+        </svg>
+      </span>`;
+    }
+
+    if (kind === "palme") {
+      return `<span class="${classes}"${titleAttr} aria-label="Guldpalmen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 22c3.2-5.2 5.6-10.8 7.2-17.2"></path>
+          <path d="M12.7 6.4C9.4 5.5 7 6.2 5 8.4c3.1.8 5.5.1 7.7-2Z"></path>
+          <path d="M13.8 3.5c2.8.1 4.8 1.4 6.2 3.8-3 .1-5-1.2-6.2-3.8Z"></path>
+          <path d="M11.5 10c-3.5-.2-6 1-7.5 3.5 3.4.3 6-1 7.5-3.5Z"></path>
+          <path d="M12.8 8.5c3.1.7 5 2.4 5.8 5-3.1-.5-5-2.2-5.8-5Z"></path>
+          <path d="M9.8 14c-3.1.4-5.1 1.9-6 4.5 3.1-.3 5.1-1.8 6-4.5Z"></path>
+        </svg>
+      </span>`;
+    }
+
+    if (kind === "guldbagge") {
+      return `<span class="${classes}"${titleAttr} aria-label="Guldbaggen">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <ellipse cx="12" cy="13.5" rx="5" ry="6.5"></ellipse>
+          <circle cx="12" cy="6" r="2.7"></circle>
+          <path d="M12 8v12M7 11 3.5 8.5M7 15H3M8 18.5l-3 2M17 11l3.5-2.5M17 15h4M16 18.5l3 2"></path>
+        </svg>
+      </span>`;
+    }
+
+    return `<ha-icon class="award-symbol generic ${extraClass}" icon="${winner ? "mdi:trophy-award" : "mdi:medal-outline"}"${titleAttr}></ha-icon>`;
+  }
+
+  _awardBadgeFor(award, item) {
+    const kind = this._awardKind(award, item);
 
     const wins = Number(award.wins || 0);
     const isWinner = award.winner === true || wins > 0;
 
-    if (isOscar) {
+    if (kind === "oscar") {
       const nominations = Number(award.nominations || 0);
       const winningCategories = Array.isArray(award.winning_categories)
         ? award.winning_categories.filter(Boolean)
@@ -605,27 +657,50 @@ class MediaTrackerCard extends HTMLElement {
 
       return `
         <span class="award-badge ${isWinner ? "winner" : ""}">
-          <ha-icon icon="${isWinner ? "mdi:trophy-award" : "mdi:medal-outline"}"></ha-icon>
+          ${this._awardSymbol(award, isWinner, "", "", item)}
           ${this._escape(label)}
         </span>
       `;
     }
 
-    if (isWinner) {
-      return `
-        <span class="award-badge winner">
-          <ha-icon icon="mdi:trophy-award"></ha-icon>
-          Vinnare
-        </span>
-      `;
+    const winningCategories = Array.isArray(award.winning_categories)
+      ? award.winning_categories.filter(Boolean)
+      : [];
+    const category = winningCategories.length === 1
+      ? winningCategories[0]
+      : "";
+
+    let label;
+    if (kind === "guldbagge") {
+      label = isWinner
+        ? category ? `Guldbagge: ${category}` : "Guldbaggevinnare"
+        : "Guldbaggenominerad";
+    } else if (kind === "palme") {
+      label = isWinner
+        ? String(category).toLowerCase() === "palme d'or"
+          ? "Guldpalmen"
+          : category ? `Cannes: ${category}` : "Cannesvinnare"
+        : "Cannesnominerad";
+    } else {
+      const organization = award.organization || award.source || "Award";
+      label = isWinner
+        ? category ? `${organization}: ${category}` : `${organization}: vinnare`
+        : `${organization}: nominerad`;
     }
 
     return `
-      <span class="award-badge">
-        <ha-icon icon="mdi:medal-outline"></ha-icon>
-        Nominerad
+      <span class="award-badge ${isWinner ? "winner" : ""}">
+        ${this._awardSymbol(award, isWinner, "", "", item)}
+        ${this._escape(label)}
       </span>
     `;
+  }
+
+  _awardBadge(item) {
+    const awards = Array.isArray(item?.awards) && item.awards.length
+      ? item.awards
+      : item?.award ? [item.award] : [];
+    return awards.map((award) => this._awardBadgeFor(award, item)).join(" ");
   }
 
   _actions(item, index) {
@@ -1006,6 +1081,22 @@ class MediaTrackerCard extends HTMLElement {
             font-weight:600;
           }
           .award-badge ha-icon { --mdc-icon-size:15px; }
+          .award-symbol {
+            width:16px;height:16px;display:inline-flex;
+            align-items:center;justify-content:center;flex:0 0 auto;
+          }
+          .award-symbol svg {
+            width:100%;height:100%;overflow:visible;
+            fill:currentColor;stroke:currentColor;stroke-width:1.35;
+            stroke-linecap:round;stroke-linejoin:round;
+          }
+          .award-symbol.palme svg { fill:none;stroke-width:1.7; }
+          .award-symbol.guldbagge svg ellipse,
+          .award-symbol.guldbagge svg circle { stroke:none; }
+          .award-symbol.guldbagge svg path { fill:none; }
+          .award-badge.winner .award-symbol {
+            color:var(--warning-color,#d4a017);
+          }
           .providers {
             min-height:30px;display:flex;align-items:center;
             flex-wrap:wrap;gap:7px;
