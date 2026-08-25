@@ -262,3 +262,36 @@ immediately:
 The Home Assistant service call then runs normally. If it fails, the item is
 restored in the card. This avoids making the UI wait for a full Media Watch
 coordinator refresh.
+
+
+### v0.7.3 episode queue and flicker fix
+
+- Episode and season watched actions no longer optimistically hide the series.
+  The row stays visible while the action runs and advances to the next unwatched
+  episode when the backend feed updates.
+- Optimistic hiding remains enabled for movie/discovery actions that genuinely
+  remove the item from the current feed.
+- The card no longer rebuilds its DOM for unrelated Home Assistant state
+  updates; it only re-renders when its configured entity changes or when a
+  local card filter/configuration changes.
+
+
+### v0.7.4 discovery profiles
+
+Dynamic discovery-profile sensors from Media Watch v0.13.0 use the same card:
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_<your_profile_entity>
+title: My queue
+show_filters: true
+```
+
+Profile items support Watchlist, Watched and Dismiss actions.
+
+
+### v0.7.5 historical award metadata
+
+Award-profile items can show aggregate Oscar metadata, for example
+`2 Oscars · 7 nom.`. The same generic Media Tracker Card is used for dynamic
+award discovery profiles.

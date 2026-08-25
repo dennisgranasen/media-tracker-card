@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.2";
+const CARD_VERSION = "0.7.5";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -25,6 +25,9 @@ class MediaTrackerCard extends HTMLElement {
 
     this._optimisticHidden = this._optimisticHidden || new Set();
 
+    // Config changes must force a render even if the entity did not change.
+    this._lastEntityStamp = null;
+
     this._runtimeFilters = {
       provider_filter: this._config.provider_filter,
       mood_filter: this._config.mood_filter,
@@ -38,6 +41,17 @@ class MediaTrackerCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+
+    const state = this._state();
+    const stamp = state
+      ? `${state.state}|${state.last_updated}|${state.last_changed}`
+      : "missing";
+
+    if (stamp === this._lastEntityStamp) {
+      return;
+    }
+
+    this._lastEntityStamp = stamp;
     this._render();
   }
 
@@ -336,9 +350,10 @@ class MediaTrackerCard extends HTMLElement {
   }
 
   _shouldOptimisticallyHide(action) {
+    // Movie/discovery actions remove the current item from this feed.
+    // Episode/season actions should keep the show visible and advance
+    // to the next unwatched episode when the backend feed updates.
     return [
-      "episode-watched",
-      "season-watched",
       "movie-watched",
       "watchlist",
       "dismiss",
@@ -425,7 +440,23 @@ class MediaTrackerCard extends HTMLElement {
 
   _awardBadge(item) {
     const award = item?.award;
-    if (!award || item.source !== "oscars") return "";
+    if (!award) return "";
+
+    if (award.organization === "Academy Awards") {
+      const wins = Number(award.wins || 0);
+      const nominations = Number(award.nominations || 0);
+      const label =
+        wins > 0
+          ? `${wins} Oscar${wins === 1 ? "" : "s"} · ${nominations} nom.`
+          : `${nominations} Oscar-nom.`;
+
+      return `
+        <span class="award-badge ${wins > 0 ? "winner" : ""}">
+          <ha-icon icon="${wins > 0 ? "mdi:trophy-award" : "mdi:medal-outline"}"></ha-icon>
+          ${this._escape(label)}
+        </span>
+      `;
+    }
 
     if (award.winner) {
       return `
@@ -477,6 +508,20 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "personalized") {
+      return `
+        <button class="action primary" data-action="watchlist" data-index="${index}">
+          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+        </button>
+        <button class="action" data-action="movie-watched" data-index="${index}">
+          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        </button>
+        <button class="action" data-action="dismiss" data-index="${index}">
+          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+        </button>
+      `;
+    }
+
+    if (item.source === "profile") {
       return `
         <button class="action primary" data-action="watchlist" data-index="${index}">
           <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
@@ -567,6 +612,13 @@ class MediaTrackerCard extends HTMLElement {
             this._render();
           }
 
+          const originalDisabled = button.disabled;
+
+          if (!optimistic) {
+            button.disabled = true;
+            button.classList.add("busy");
+          }
+
           try {
             await this._action(event, item, action);
           } catch (error) {
@@ -580,6 +632,11 @@ class MediaTrackerCard extends HTMLElement {
               item,
               error,
             );
+          } finally {
+            if (!optimistic && button.isConnected) {
+              button.disabled = originalDisabled;
+              button.classList.remove("busy");
+            }
           }
         }
       });
@@ -774,6 +831,19 @@ class MediaTrackerCard extends HTMLElement {
           }
           button.action.icon-only { padding:6px;margin-left:auto; }
           button.action ha-icon { --mdc-icon-size:17px; }
+          button.action:disabled {
+            opacity:.65;
+            cursor:default;
+          }
+          button.action.busy ha-icon {
+            animation:media-tracker-spin .8s linear infinite;
+          }
+          @keyframes media-tracker-spin {
+            to { transform:rotate(360deg); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            button.action.busy ha-icon { animation:none; }
+          }
           .empty,.error { padding:18px 16px;color:var(--secondary-text-color); }
           @media (max-width:500px) {
             .media-item {
