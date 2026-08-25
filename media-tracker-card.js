@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.8";
+const CARD_VERSION = "0.7.9";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -388,6 +388,7 @@ class MediaTrackerCard extends HTMLElement {
     return [
       "movie-watched",
       "watchlist",
+      "unfollow",
       "dismiss",
     ].includes(action);
   }
@@ -435,6 +436,14 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "watchlist") {
       await this._call("follow", {
+        media_type: item.media_type || "movie",
+        tmdb_id: Number(item.tmdb_id),
+      });
+      return;
+    }
+
+    if (action === "unfollow") {
+      await this._call("unfollow", {
         media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
       });
@@ -627,6 +636,17 @@ class MediaTrackerCard extends HTMLElement {
         </button>
         <button class="action" data-action="season-watched" data-index="${index}">
           <ha-icon icon="mdi:check-all"></ha-icon><span>Säsong</span>
+        </button>
+      `;
+    }
+
+    if (item.source === "watchlist") {
+      return `
+        <button class="action primary" data-action="movie-watched" data-index="${index}">
+          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        </button>
+        <button class="action" data-action="unfollow" data-index="${index}">
+          <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>Ta bort</span>
         </button>
       `;
     }

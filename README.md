@@ -45,6 +45,9 @@ provider_filter: my
 The **Sedd** action marks the movie watched and removes it from the TMDB
 watchlist.
 
+Use **Ta bort** to remove a movie from the TMDB watchlist without marking it
+as watched.
+
 ## Discovery
 
 All discovery results available on streaming services in your configured
@@ -327,3 +330,9 @@ award discovery profiles.
 Movie posters are 120 pixels wide by default. Set `poster_width` between 78
 and 220 to choose another size; the card preserves the poster's 2:3 ratio and
 limits its width responsively on narrow screens.
+
+
+### v0.7.9 remove from watchlist
+
+Watchlist rows have a separate **Ta bort** action that calls
+`media_watch.unfollow` without changing the movie's local watched state.
