@@ -344,3 +344,11 @@ Watchlist rows have a separate **Ta bort** action that calls
   uses a golden beetle instead of sharing one generic trophy.
 - Profiles containing several award organizations render one badge per source,
   so an Oscar nomination cannot be confused with a Guldbagge win.
+
+
+### v0.7.11 unreleased media actions
+
+- Future watchlist movies show their premiere date instead of **Sedd**, while
+  **Ta bort** remains available.
+- Future episode rows show their air date instead of watched/season actions.
+  Watched actions become available on the release date.

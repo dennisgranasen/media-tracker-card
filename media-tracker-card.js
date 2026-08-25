@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.10";
+const CARD_VERSION = "0.7.11";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -558,6 +558,37 @@ class MediaTrackerCard extends HTMLElement {
     return lines.join("");
   }
 
+  _releaseDate(item) {
+    return item?.media_type === "tv"
+      ? item.airdate || item.release_date || ""
+      : item?.release_date || "";
+  }
+
+  _isUnreleased(item) {
+    const releaseDate = String(this._releaseDate(item)).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return false;
+
+    const now = new Date();
+    const today = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
+    return releaseDate > today;
+  }
+
+  _releaseInfo(item) {
+    const releaseDate = this._releaseDate(item);
+    if (!releaseDate) return "";
+    const label = item.media_type === "tv" ? "Sänds" : "Premiär";
+    return `
+      <span class="release-info">
+        <ha-icon icon="mdi:calendar-clock"></ha-icon>
+        ${label} ${this._escape(this._formatDate(releaseDate))}
+      </span>
+    `;
+  }
+
   _awardKind(award, item = {}) {
     const organization = String(award.organization || "").toLowerCase();
     const source = String(award.source || "").toLowerCase();
@@ -705,6 +736,8 @@ class MediaTrackerCard extends HTMLElement {
 
   _actions(item, index) {
     if (item.source === "episodes") {
+      if (this._isUnreleased(item)) return this._releaseInfo(item);
+
       return `
         <button class="action primary" data-action="episode-watched" data-index="${index}">
           <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
@@ -716,10 +749,16 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "watchlist") {
+      const watchedAction = this._isUnreleased(item)
+        ? this._releaseInfo(item)
+        : `
+          <button class="action primary" data-action="movie-watched" data-index="${index}">
+            <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+          </button>
+        `;
+
       return `
-        <button class="action primary" data-action="movie-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
-        </button>
+        ${watchedAction}
         <button class="action" data-action="unfollow" data-index="${index}">
           <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>Ta bort</span>
         </button>
@@ -1112,6 +1151,11 @@ class MediaTrackerCard extends HTMLElement {
           .actions {
             display:flex;gap:7px;align-items:center;margin-top:auto;
           }
+          .release-info {
+            display:inline-flex;align-items:center;gap:5px;
+            color:var(--secondary-text-color);font-size:.78rem;
+          }
+          .release-info ha-icon { --mdc-icon-size:17px; }
           button.action {
             appearance:none;border:0;border-radius:999px;padding:6px 10px;
             display:inline-flex;align-items:center;gap:5px;cursor:pointer;
