@@ -352,3 +352,18 @@ Watchlist rows have a separate **Ta bort** action that calls
   **Ta bort** remains available.
 - Future episode rows show their air date instead of watched/season actions.
   Watched actions become available on the release date.
+
+
+### v0.7.12 watched TV discovery action
+
+Using **Sedd** on a TV discovery/profile row records watched progress and then
+follows the show through `media_watch.follow`. See v0.7.13 for the
+released-episode behavior used by the current card.
+
+
+### v0.7.13 released episodes only
+
+The TV discovery **Sedd** action now calls
+`media_watch.mark_released_episodes_watched`. Already aired episodes are
+marked individually, so later episodes in the same season and new seasons
+remain unwatched and can appear in the episode queue.

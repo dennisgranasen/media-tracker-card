@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.11";
+const CARD_VERSION = "0.7.13";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -387,6 +387,7 @@ class MediaTrackerCard extends HTMLElement {
 
     return [
       "movie-watched",
+      "tv-watched",
       "watchlist",
       "unfollow",
       "dismiss",
@@ -422,6 +423,18 @@ class MediaTrackerCard extends HTMLElement {
       await this._call("mark_watched", {
         media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
+      });
+      return;
+    }
+
+    if (action === "tv-watched") {
+      const tmdbId = Number(item.tmdb_id);
+      await this._call("mark_released_episodes_watched", {
+        tmdb_id: tmdbId,
+      });
+      await this._call("follow", {
+        media_type: "tv",
+        tmdb_id: tmdbId,
       });
       return;
     }
@@ -786,12 +799,15 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "personalized") {
+      const watchedAction = item.media_type === "tv"
+        ? "tv-watched"
+        : "movie-watched";
       return `
         <button class="action primary" data-action="watchlist" data-index="${index}">
           <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
         </button>
-        <button class="action" data-action="movie-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        <button class="action" data-action="${watchedAction}" data-index="${index}">
+          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
         </button>
         <button class="action" data-action="dismiss" data-index="${index}">
           <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
@@ -800,6 +816,9 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "profile") {
+      const watchedActionName = item.media_type === "tv"
+        ? "tv-watched"
+        : "movie-watched";
       const watchedAction = item.watched
         ? `
           <button class="action primary" data-action="movie-unwatched" data-index="${index}">
@@ -807,8 +826,8 @@ class MediaTrackerCard extends HTMLElement {
           </button>
         `
         : `
-          <button class="action" data-action="movie-watched" data-index="${index}">
-            <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+          <button class="action" data-action="${watchedActionName}" data-index="${index}">
+            <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
           </button>
         `;
 
@@ -826,12 +845,15 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "discovery") {
+      const watchedAction = item.media_type === "tv"
+        ? "tv-watched"
+        : "movie-watched";
       return `
         <button class="action primary" data-action="watchlist" data-index="${index}">
           <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
         </button>
-        <button class="action" data-action="movie-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        <button class="action" data-action="${watchedAction}" data-index="${index}">
+          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
         </button>
         <button class="action" data-action="dismiss" data-index="${index}">
           <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
