@@ -90,6 +90,7 @@ watchlist or your selected provider settings.
 ```yaml
 show_provider_name: false
 provider_icon_size: 28
+poster_width: 120
 date_format: short
 hide_empty: false
 ```
@@ -319,3 +320,10 @@ award discovery profiles.
   line.
 - A trophy is shown directly after an actor or director when Oscar metadata
   identifies that person as the winner for the film.
+
+
+### v0.7.8 larger configurable posters
+
+Movie posters are 120 pixels wide by default. Set `poster_width` between 78
+and 220 to choose another size; the card preserves the poster's 2:3 ratio and
+limits its width responsively on narrow screens.

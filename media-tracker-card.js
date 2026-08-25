@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.7";
+const CARD_VERSION = "0.7.8";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -12,6 +12,7 @@ class MediaTrackerCard extends HTMLElement {
       max: 10,
       show_provider_name: false,
       provider_icon_size: 26,
+      poster_width: 120,
       date_format: "short",
       hide_empty: false,
       provider_filter: "all",
@@ -492,7 +493,10 @@ class MediaTrackerCard extends HTMLElement {
     for (const award of awards) {
       for (const win of award.person_wins || []) {
         if (win?.role !== role || !win?.name) continue;
-        wins.set(this._personKey(win.name), win);
+        wins.set(this._personKey(win.name), {
+          ...win,
+          organization: award.organization || award.source || "Award",
+        });
       }
     }
     return wins;
@@ -504,9 +508,15 @@ class MediaTrackerCard extends HTMLElement {
       const win = wins.get(this._personKey(name));
       if (!win) return escapedName;
 
-      const title = this._escape(
-        `Oscar: ${win.category || (win.role === "directing" ? "regi" : "skådespeleri")}`,
-      );
+      const organization = String(win.organization || "Award");
+      const awardName = /oscar|academy awards/i.test(organization)
+        ? "Oscar"
+        : /emmy/i.test(organization)
+          ? "Emmy"
+          : organization;
+      const title = this._escape(`${awardName}: ${
+        win.category || (win.role === "directing" ? "regi" : "skådespeleri")
+      }`);
       return `<span class="award-person">${escapedName}<ha-icon class="credit-award" icon="mdi:trophy-award" title="${title}"></ha-icon></span>`;
     }).join(", ");
   }
@@ -860,6 +870,10 @@ class MediaTrackerCard extends HTMLElement {
 
     const state = this._state();
     const items = this._items();
+    const posterWidth = Math.max(
+      78,
+      Math.min(220, Number(this._config.poster_width || 120)),
+    );
 
     if (this._config.hide_empty && state && items.length === 0) {
       this.innerHTML = "";
@@ -870,7 +884,14 @@ class MediaTrackerCard extends HTMLElement {
       <ha-card>
         <style>
           :host { display:block; }
-          ha-card { overflow:hidden; }
+          ha-card {
+            overflow:hidden;
+            --media-tracker-poster-width:clamp(
+              78px,
+              ${posterWidth}px,
+              38vw
+            );
+          }
           .header {
             display:flex;
             align-items:center;
@@ -903,13 +924,14 @@ class MediaTrackerCard extends HTMLElement {
           }
           .media-item {
             display:grid;
-            grid-template-columns:92px minmax(0,1fr);
-            min-height:138px;
+            grid-template-columns:var(--media-tracker-poster-width) minmax(0,1fr);
             cursor:pointer;
             border-top:1px solid var(--divider-color);
           }
           .poster {
-            width:92px;height:138px;object-fit:cover;display:block;
+            width:var(--media-tracker-poster-width);
+            height:auto;aspect-ratio:2 / 3;
+            object-fit:cover;display:block;
             background:var(--secondary-background-color);
           }
           .poster.placeholder {
@@ -1007,11 +1029,6 @@ class MediaTrackerCard extends HTMLElement {
           }
           .empty,.error { padding:18px 16px;color:var(--secondary-text-color); }
           @media (max-width:500px) {
-            .media-item {
-              grid-template-columns:78px minmax(0,1fr);
-              min-height:117px;
-            }
-            .poster { width:78px;height:117px; }
             .content { padding:9px 10px 8px;gap:4px; }
             .date { font-size:.72rem; }
             button.action span { display:none; }
