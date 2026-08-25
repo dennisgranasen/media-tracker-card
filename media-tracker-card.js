@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.6";
+const CARD_VERSION = "0.7.7";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -478,8 +478,40 @@ class MediaTrackerCard extends HTMLElement {
     return parts.join(" · ");
   }
 
+  _personKey(value) {
+    return String(value || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+  }
+
+  _personWins(item, role) {
+    const awards = [item?.award, ...(item?.awards || [])].filter(Boolean);
+    const wins = new Map();
+    for (const award of awards) {
+      for (const win of award.person_wins || []) {
+        if (win?.role !== role || !win?.name) continue;
+        wins.set(this._personKey(win.name), win);
+      }
+    }
+    return wins;
+  }
+
+  _creditNames(names, wins) {
+    return names.map((name) => {
+      const escapedName = this._escape(name);
+      const win = wins.get(this._personKey(name));
+      if (!win) return escapedName;
+
+      const title = this._escape(
+        `Oscar: ${win.category || (win.role === "directing" ? "regi" : "skådespeleri")}`,
+      );
+      return `<span class="award-person">${escapedName}<ha-icon class="credit-award" icon="mdi:trophy-award" title="${title}"></ha-icon></span>`;
+    }).join(", ");
+  }
+
   _movieCredits(item) {
-    const parts = [];
     const directors = Array.isArray(item.directors)
       ? item.directors.filter(Boolean)
       : [];
@@ -487,9 +519,23 @@ class MediaTrackerCard extends HTMLElement {
       ? item.cast.filter(Boolean).slice(0, 3)
       : [];
 
-    if (directors.length) parts.push(`Regi: ${directors.join(", ")}`);
-    if (cast.length) parts.push(`I rollerna: ${cast.join(", ")}`);
-    return parts.join(" · ");
+    const lines = [];
+    if (cast.length) {
+      lines.push(`
+        <div class="credit-line cast-line">
+          ${this._creditNames(cast, this._personWins(item, "acting"))}
+        </div>
+      `);
+    }
+    if (directors.length) {
+      lines.push(`
+        <div class="credit-line director-line">
+          <span class="credit-label">Regi:</span>
+          ${this._creditNames(directors, this._personWins(item, "directing"))}
+        </div>
+      `);
+    }
+    return lines.join("");
   }
 
   _awardBadge(item) {
@@ -680,7 +726,7 @@ class MediaTrackerCard extends HTMLElement {
             <div class="date">${this._escape(rightMeta)}</div>
           </div>
           <div class="subtitle">${this._escape(subtitle)}</div>
-          ${isTv ? "" : `<div class="credits">${this._escape(this._movieCredits(item))}</div>`}
+          ${isTv ? "" : `<div class="credits">${this._movieCredits(item)}</div>`}
           ${this._awardBadge(item)}
           <div class="providers">${this._providers(item)}</div>
           <div class="actions">
@@ -889,8 +935,18 @@ class MediaTrackerCard extends HTMLElement {
             text-overflow:ellipsis;
           }
           .credits {
+            display:flex;flex-direction:column;gap:2px;
             color:var(--secondary-text-color);font-size:.78rem;
+          }
+          .credit-line {
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+          }
+          .credit-label { font-weight:600; }
+          .award-person { display:inline-flex;align-items:center;gap:2px; }
+          .credit-award {
+            --mdc-icon-size:14px;
+            color:var(--warning-color,#f5a623);
+            flex:0 0 auto;
           }
           .award-badge {
             width:max-content;

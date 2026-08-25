@@ -311,3 +311,11 @@ award discovery profiles.
   is configured to include watched titles.
 - Movie rows show the release year, director and up to three leading cast
   members when supplied by the Media Watch sensor.
+
+
+### v0.7.7 split credits and person awards
+
+- Leading cast is shown on its own line, followed by `Regi:` on a separate
+  line.
+- A trophy is shown directly after an actor or director when Oscar metadata
+  identifies that person as the winner for the film.
