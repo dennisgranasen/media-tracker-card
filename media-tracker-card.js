@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.5";
+const CARD_VERSION = "0.7.6";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {
@@ -258,7 +258,30 @@ class MediaTrackerCard extends HTMLElement {
       return true;
     });
 
-    return filtered.slice(
+    const awardYear = (item) => {
+      const awards = [item?.award, ...(item?.awards || [])].filter(Boolean);
+      const years = awards.flatMap((award) => [
+        award.ceremony_year,
+        ...(Array.isArray(award.award_years) ? award.award_years : []),
+      ]);
+
+      return years.reduce((latest, year) => {
+        const numericYear = Number(year);
+        return Number.isFinite(numericYear)
+          ? Math.max(latest, numericYear)
+          : latest;
+      }, 0);
+    };
+
+    // Award candidates can finish TMDB enrichment in a different order than
+    // the source data. Restore the user-facing chronology without mutating
+    // the entity attribute array. Modern JS sorting is stable, so films from
+    // the same award year retain the backend's relevance order.
+    const sorted = filtered.some((item) => item?.award || item?.awards)
+      ? [...filtered].sort((a, b) => awardYear(b) - awardYear(a))
+      : filtered;
+
+    return sorted.slice(
       0,
       Math.max(1, Number(this._config.max || 10)),
     );
@@ -349,10 +372,18 @@ class MediaTrackerCard extends HTMLElement {
     return `${item?.media_type || "movie"}:${item?.tmdb_id}`;
   }
 
-  _shouldOptimisticallyHide(action) {
+  _shouldOptimisticallyHide(action, item) {
     // Movie/discovery actions remove the current item from this feed.
     // Episode/season actions should keep the show visible and advance
     // to the next unwatched episode when the backend feed updates.
+    if (
+      action === "movie-watched" &&
+      item?.source === "profile" &&
+      this._state()?.attributes?.exclude_watched === false
+    ) {
+      return false;
+    }
+
     return [
       "movie-watched",
       "watchlist",
@@ -387,6 +418,14 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "movie-watched") {
       await this._call("mark_watched", {
+        media_type: item.media_type || "movie",
+        tmdb_id: Number(item.tmdb_id),
+      });
+      return;
+    }
+
+    if (action === "movie-unwatched") {
+      await this._call("mark_unwatched", {
         media_type: item.media_type || "movie",
         tmdb_id: Number(item.tmdb_id),
       });
@@ -430,7 +469,8 @@ class MediaTrackerCard extends HTMLElement {
 
   _movieMeta(item) {
     const parts = [];
-    if (item.release_date) parts.push(this._formatDate(item.release_date));
+    const releaseYear = String(item.release_date || "").slice(0, 4);
+    if (/^\d{4}$/.test(releaseYear)) parts.push(releaseYear);
     const rating = Number(item.vote_average);
     if (!Number.isNaN(rating) && rating > 0) {
       parts.push(`★ ${rating.toFixed(1)}`);
@@ -438,27 +478,75 @@ class MediaTrackerCard extends HTMLElement {
     return parts.join(" · ");
   }
 
+  _movieCredits(item) {
+    const parts = [];
+    const directors = Array.isArray(item.directors)
+      ? item.directors.filter(Boolean)
+      : [];
+    const cast = Array.isArray(item.cast)
+      ? item.cast.filter(Boolean).slice(0, 3)
+      : [];
+
+    if (directors.length) parts.push(`Regi: ${directors.join(", ")}`);
+    if (cast.length) parts.push(`I rollerna: ${cast.join(", ")}`);
+    return parts.join(" · ");
+  }
+
   _awardBadge(item) {
     const award = item?.award;
     if (!award) return "";
 
-    if (award.organization === "Academy Awards") {
-      const wins = Number(award.wins || 0);
+    const organization = String(award.organization || "").toLowerCase();
+    const isOscar =
+      item.source === "oscars" ||
+      award.source === "oscars" ||
+      organization.includes("academy awards") ||
+      organization.includes("oscar");
+
+    const wins = Number(award.wins || 0);
+    const isWinner = award.winner === true || wins > 0;
+
+    if (isOscar) {
       const nominations = Number(award.nominations || 0);
-      const label =
-        wins > 0
-          ? `${wins} Oscar${wins === 1 ? "" : "s"} · ${nominations} nom.`
-          : `${nominations} Oscar-nom.`;
+      const winningCategories = Array.isArray(award.winning_categories)
+        ? award.winning_categories.filter(Boolean)
+        : [];
+      const category = winningCategories.length === 1
+        ? winningCategories[0]
+        : award.category;
+
+      const categoryNames = {
+        "BEST PICTURE": "bästa film",
+        "Best Picture": "bästa film",
+        DIRECTING: "bästa regi",
+        Directing: "bästa regi",
+      };
+      const categoryLabel = categoryNames[category] || category || "";
+
+      let label;
+      if (isWinner && categoryLabel && (wins <= 1 || award.winner === true)) {
+        label = `Oscar för ${categoryLabel}`;
+      } else if (isWinner) {
+        const winCount = Math.max(1, wins);
+        label = `${winCount} Oscar${winCount === 1 ? "" : "s"}`;
+        if (nominations > 0) label += ` · ${nominations} nom.`;
+      } else {
+        label = nominations > 0
+          ? `${nominations} Oscar-nom.`
+          : categoryLabel
+            ? `Oscar-nominerad: ${categoryLabel}`
+            : "Oscar-nominerad";
+      }
 
       return `
-        <span class="award-badge ${wins > 0 ? "winner" : ""}">
-          <ha-icon icon="${wins > 0 ? "mdi:trophy-award" : "mdi:medal-outline"}"></ha-icon>
+        <span class="award-badge ${isWinner ? "winner" : ""}">
+          <ha-icon icon="${isWinner ? "mdi:trophy-award" : "mdi:medal-outline"}"></ha-icon>
           ${this._escape(label)}
         </span>
       `;
     }
 
-    if (award.winner) {
+    if (isWinner) {
       return `
         <span class="award-badge winner">
           <ha-icon icon="mdi:trophy-award"></ha-icon>
@@ -522,13 +610,25 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (item.source === "profile") {
+      const watchedAction = item.watched
+        ? `
+          <button class="action primary" data-action="movie-unwatched" data-index="${index}">
+            <ha-icon icon="mdi:check-circle"></ha-icon><span>Avmarkera sedd</span>
+          </button>
+        `
+        : `
+          <button class="action" data-action="movie-watched" data-index="${index}">
+            <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+          </button>
+        `;
+
       return `
-        <button class="action primary" data-action="watchlist" data-index="${index}">
-          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
-        </button>
-        <button class="action" data-action="movie-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
-        </button>
+        ${item.watched ? "" : `
+          <button class="action primary" data-action="watchlist" data-index="${index}">
+            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+          </button>
+        `}
+        ${watchedAction}
         <button class="action" data-action="dismiss" data-index="${index}">
           <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
         </button>
@@ -580,6 +680,7 @@ class MediaTrackerCard extends HTMLElement {
             <div class="date">${this._escape(rightMeta)}</div>
           </div>
           <div class="subtitle">${this._escape(subtitle)}</div>
+          ${isTv ? "" : `<div class="credits">${this._escape(this._movieCredits(item))}</div>`}
           ${this._awardBadge(item)}
           <div class="providers">${this._providers(item)}</div>
           <div class="actions">
@@ -604,7 +705,7 @@ class MediaTrackerCard extends HTMLElement {
           this._open(event, item);
         } else {
           const action = button.dataset.action;
-          const optimistic = this._shouldOptimisticallyHide(action);
+          const optimistic = this._shouldOptimisticallyHide(action, item);
           const key = this._optimisticKey(item);
 
           if (optimistic) {
@@ -786,6 +887,10 @@ class MediaTrackerCard extends HTMLElement {
             min-height:1.1em;color:var(--secondary-text-color);
             font-size:.9rem;white-space:nowrap;overflow:hidden;
             text-overflow:ellipsis;
+          }
+          .credits {
+            color:var(--secondary-text-color);font-size:.78rem;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
           }
           .award-badge {
             width:max-content;

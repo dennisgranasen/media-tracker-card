@@ -289,9 +289,25 @@ show_filters: true
 
 Profile items support Watchlist, Watched and Dismiss actions.
 
+Profiles whose **Exclude watched titles** option is disabled also include
+watched films. Their checked **Avmarkera sedd** action calls
+`media_watch.mark_unwatched`, so the local watched marker can be removed again.
+
 
 ### v0.7.5 historical award metadata
 
 Award-profile items can show aggregate Oscar metadata, for example
 `2 Oscars · 7 nom.`. The same generic Media Tracker Card is used for dynamic
 award discovery profiles.
+
+
+### v0.7.6 award ordering and winner details
+
+- Award-profile items are ordered from the newest award year to the oldest.
+- Oscar winners are detected from both current and legacy Media Watch metadata.
+  When a single winning category is available, the badge names it, for example
+  `Oscar för bästa film`.
+- Watched profile items can be unmarked directly in the card when the profile
+  is configured to include watched titles.
+- Movie rows show the release year, director and up to three leading cast
+  members when supplied by the Media Watch sensor.
