@@ -5,7 +5,7 @@ A Lovelace card for the
 Home Assistant integration. It renders episode queues, movie watchlists and
 dynamic movie or TV discovery profiles from an entity's `items` attribute.
 
-Media Watch **0.17.10 or later** is recommended so every card action, including
+Media Watch **1.0 or later** is recommended so every card action, including
 marking only released TV episodes as watched, is available.
 
 ## Installation
