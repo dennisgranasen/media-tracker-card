@@ -32,7 +32,7 @@ Add the card as a manual card. The only required option is `entity`:
 ```yaml
 type: custom:media-tracker-card
 entity: sensor.media_watch_episodes
-title: Nästa att se
+title: Next to watch
 max: 10
 ```
 
@@ -64,7 +64,7 @@ poster_width: 140
 ```yaml
 type: custom:media-tracker-card
 entity: sensor.media_watch_modern_horror
-title: Modern skräck
+title: Modern horror
 provider_filter: my
 show_filters: true
 max: 20
@@ -118,8 +118,8 @@ genre_match: all
 When the sensor provides the corresponding metadata, movie rows show:
 
 - Poster, title, release year and TMDB rating.
-- Up to three leading actors, followed by the director on a separate `Regi:`
-  line.
+- Up to three leading actors, followed by the director on a separate
+  `Directed by:` line.
 - Streaming-provider logos and optionally their names.
 - Award badges, nominations and wins.
 
@@ -137,16 +137,16 @@ The available buttons depend on the feed and item:
 
 | Feed | Actions |
 |---|---|
-| Episode queue | **Sedd** marks the episode watched. **Säsong** marks the displayed season watched after confirmation. |
-| Movie watchlist | **Sedd** marks the movie watched and removes it from the TMDB watchlist. **Ta bort** removes it without changing watched state. |
-| Discovery profile | **Watchlist**, **Sedd** or **Dölj**. A watched item instead offers **Avmarkera sedd**. |
+| Episode queue | **Watched** marks the episode watched. **Season** marks the displayed season watched after confirmation. |
+| Movie watchlist | **Watched** marks the movie watched and removes it from the TMDB watchlist. **Remove** removes it without changing watched state. |
+| Discovery profile | **Watchlist**, **Watched** or **Hide**. A watched item instead offers **Unmark watched**. |
 
-To keep watched titles in a discovery profile and make **Avmarkera sedd**
+To keep watched titles in a discovery profile and make **Unmark watched**
 available, disable **Exclude watched titles** in that profile under
 **Settings → Devices & services → Media Watch → Configure → Discovery
 profiles**.
 
-For a TV series in a discovery profile, **Sedd**:
+For a TV series in a discovery profile, **Watched**:
 
 1. Marks only regular episodes with an air date of today or earlier as watched.
 2. Adds the show to the TV watchlist so it remains followed.
@@ -157,10 +157,18 @@ queue. Season 0 specials are not included.
 
 Unreleased episodes do not show watched actions; the air date is shown instead.
 Unreleased watchlist movies show the premiere date and retain only the
-**Ta bort** action until release day.
+**Remove** action until release day.
 
 Actions update the card immediately when appropriate. If the Home Assistant
 service call fails, the item is restored and an error is shown.
+
+## Localization
+
+The card uses the language selected in Home Assistant for action labels,
+filters, release information, status messages and generated award text.
+English and Swedish are currently included; every other language falls back to
+English. User-configured titles and metadata supplied by Media Watch are shown
+as provided.
 
 ## Troubleshooting
 
@@ -170,4 +178,15 @@ service-call checks to perform before opening an issue.
 ## Data attribution
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
-Watch-provider metadata is powered by JustWatch.
+
+TMDB's [watch-provider endpoint](https://developer.themoviedb.org/reference/movie-watch-providers)
+is powered by [JustWatch](https://support.justwatch.com/article/what-is-just-watch),
+a streaming guide that tracks where movies and TV shows are legally available.
+The endpoint reports providers per country and groups availability as
+subscription streaming, free/ad-supported viewing, rental or purchase.
+
+Media Watch receives that data through TMDB. The card uses provider names and
+logos from the streaming, free and ad-supported groups, plus whether a title is
+available on the services selected in Media Watch. It does not contact
+JustWatch directly and does not receive prices, complete provider catalogues or
+JustWatch recommendations.

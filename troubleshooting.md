@@ -48,7 +48,7 @@ region and provider metadata returned by Media Watch.
 
 Card buttons call `media_watch` actions. Check **Settings → System → Logs** for
 the underlying error and make sure Media Watch is up to date. The TV discovery
-**Sedd** action requires Media Watch 0.17.10 or later because it uses
+**Watched** action requires Media Watch 0.17.10 or later because it uses
 `media_watch.mark_released_episodes_watched`.
 
 You can verify that an action is registered under **Developer tools →

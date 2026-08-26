@@ -1,6 +1,87 @@
 const CARD_VERSION = "1.0.0";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
+const TRANSLATIONS = {
+  en: {
+    director: "Directed by:",
+    acting: "acting",
+    directing: "directing",
+    airs: "Airs",
+    premieres: "Premieres",
+    watched: "Watched",
+    season: "Season",
+    remove: "Remove",
+    watchlist: "Watchlist",
+    hide: "Hide",
+    unmarkWatched: "Unmark watched",
+    confirmSeason: "Mark all of season {season} of {title} as watched?",
+    mood: "Mood",
+    providers: "Providers",
+    all: "All",
+    mine: "Mine",
+    feelgood: "Feel-good",
+    exciting: "Exciting",
+    dark: "Dark",
+    family: "Family",
+    romance: "Romance",
+    scifiFantasy: "Sci-Fi/Fantasy",
+    serious: "Serious",
+    entityNotFound: "Entity {entity} was not found.",
+    empty: "Nothing to show.",
+    bestPicture: "Best Picture",
+    bestDirector: "Best Director",
+    oscarFor: "Oscar for {category}",
+    oscarNomineeCategory: "Oscar nominee: {category}",
+    oscarNominee: "Oscar nominee",
+    guldbaggeWinner: "Guldbagge winner",
+    guldbaggeNominee: "Guldbagge nominee",
+    palmeDor: "Palme d'Or",
+    cannesWinner: "Cannes winner",
+    cannesNominee: "Cannes nominee",
+    winner: "winner",
+    nominee: "nominee",
+  },
+  sv: {
+    director: "Regi:",
+    acting: "skådespeleri",
+    directing: "regi",
+    airs: "Sänds",
+    premieres: "Premiär",
+    watched: "Sedd",
+    season: "Säsong",
+    remove: "Ta bort",
+    watchlist: "Watchlist",
+    hide: "Dölj",
+    unmarkWatched: "Avmarkera sedd",
+    confirmSeason: "Markera hela säsong {season} av {title} som sedd?",
+    mood: "Humör",
+    providers: "Tjänster",
+    all: "Alla",
+    mine: "Mina",
+    feelgood: "Feel-good",
+    exciting: "Spännande",
+    dark: "Mörkt",
+    family: "Familj",
+    romance: "Romantik",
+    scifiFantasy: "Sci-Fi/Fantasy",
+    serious: "Seriöst",
+    entityNotFound: "Entiteten {entity} hittades inte.",
+    empty: "Inget att visa.",
+    bestPicture: "bästa film",
+    bestDirector: "bästa regi",
+    oscarFor: "Oscar för {category}",
+    oscarNomineeCategory: "Oscar-nominerad: {category}",
+    oscarNominee: "Oscar-nominerad",
+    guldbaggeWinner: "Guldbaggevinnare",
+    guldbaggeNominee: "Guldbaggenominerad",
+    palmeDor: "Guldpalmen",
+    cannesWinner: "Cannesvinnare",
+    cannesNominee: "Cannesnominerad",
+    winner: "vinnare",
+    nominee: "nominerad",
+  },
+};
+
 class MediaTrackerCard extends HTMLElement {
   setConfig(config) {
     if (!config?.entity) {
@@ -44,9 +125,10 @@ class MediaTrackerCard extends HTMLElement {
     this._hass = hass;
 
     const state = this._state();
-    const stamp = state
+    const entityStamp = state
       ? `${state.state}|${state.last_updated}|${state.last_changed}`
       : "missing";
+    const stamp = `${this._language()}|${entityStamp}`;
 
     if (stamp === this._lastEntityStamp) {
       return;
@@ -63,9 +145,31 @@ class MediaTrackerCard extends HTMLElement {
   static getStubConfig() {
     return {
       entity: "sensor.media_watch_episodes",
-      title: "Nästa att se",
+      title: "Next to watch",
       max: 10,
     };
+  }
+
+  _language() {
+    const language =
+      this._hass?.locale?.language ||
+      this._hass?.language ||
+      navigator.language ||
+      "en";
+    const code = String(language).toLowerCase().split(/[-_]/)[0];
+    return Object.prototype.hasOwnProperty.call(TRANSLATIONS, code)
+      ? code
+      : "en";
+  }
+
+  _t(key, replacements = {}) {
+    const template =
+      TRANSLATIONS[this._language()]?.[key] ||
+      TRANSLATIONS.en[key] ||
+      key;
+    return template.replace(/\{(\w+)\}/g, (_, name) =>
+      String(replacements[name] ?? `{${name}}`),
+    );
   }
 
   _state() {
@@ -297,8 +401,9 @@ class MediaTrackerCard extends HTMLElement {
 
     const locale =
       this._hass?.locale?.language ||
+      this._hass?.language ||
       navigator.language ||
-      "sv-SE";
+      "en";
 
     const options =
       this._config.date_format === "long"
@@ -408,7 +513,10 @@ class MediaTrackerCard extends HTMLElement {
 
     if (action === "season-watched") {
       const ok = window.confirm(
-        `Markera hela säsong ${item.season} av ${item.title} som sedd?`,
+        this._t("confirmSeason", {
+          season: item.season,
+          title: item.title,
+        }),
       );
       if (!ok) return;
 
@@ -538,7 +646,7 @@ class MediaTrackerCard extends HTMLElement {
           ? "Emmy"
           : organization;
       const title = `${awardName}: ${
-        win.category || (win.role === "directing" ? "regi" : "skådespeleri")
+        win.category || this._t(win.role === "directing" ? "directing" : "acting")
       }`;
       return `<span class="award-person">${escapedName}${this._awardSymbol(win, true, title, "credit-award")}</span>`;
     }).join(", ");
@@ -563,7 +671,7 @@ class MediaTrackerCard extends HTMLElement {
     if (directors.length) {
       lines.push(`
         <div class="credit-line director-line">
-          <span class="credit-label">Regi:</span>
+          <span class="credit-label">${this._t("director")}</span>
           ${this._creditNames(directors, this._personWins(item, "directing"))}
         </div>
       `);
@@ -593,7 +701,7 @@ class MediaTrackerCard extends HTMLElement {
   _releaseInfo(item) {
     const releaseDate = this._releaseDate(item);
     if (!releaseDate) return "";
-    const label = item.media_type === "tv" ? "Sänds" : "Premiär";
+    const label = this._t(item.media_type === "tv" ? "airs" : "premieres");
     return `
       <span class="release-info">
         <ha-icon icon="mdi:calendar-clock"></ha-icon>
@@ -636,7 +744,7 @@ class MediaTrackerCard extends HTMLElement {
     }
 
     if (kind === "palme") {
-      return `<span class="${classes}"${titleAttr} aria-label="Guldpalmen">
+      return `<span class="${classes}"${titleAttr} aria-label="${this._t("palmeDor")}">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 22c3.2-5.2 5.6-10.8 7.2-17.2"></path>
           <path d="M12.7 6.4C9.4 5.5 7 6.2 5 8.4c3.1.8 5.5.1 7.7-2Z"></path>
@@ -677,16 +785,16 @@ class MediaTrackerCard extends HTMLElement {
         : award.category;
 
       const categoryNames = {
-        "BEST PICTURE": "bästa film",
-        "Best Picture": "bästa film",
-        DIRECTING: "bästa regi",
-        Directing: "bästa regi",
+        "BEST PICTURE": this._t("bestPicture"),
+        "Best Picture": this._t("bestPicture"),
+        DIRECTING: this._t("bestDirector"),
+        Directing: this._t("bestDirector"),
       };
       const categoryLabel = categoryNames[category] || category || "";
 
       let label;
       if (isWinner && categoryLabel && (wins <= 1 || award.winner === true)) {
-        label = `Oscar för ${categoryLabel}`;
+        label = this._t("oscarFor", { category: categoryLabel });
       } else if (isWinner) {
         const winCount = Math.max(1, wins);
         label = `${winCount} Oscar${winCount === 1 ? "" : "s"}`;
@@ -695,8 +803,8 @@ class MediaTrackerCard extends HTMLElement {
         label = nominations > 0
           ? `${nominations} Oscar-nom.`
           : categoryLabel
-            ? `Oscar-nominerad: ${categoryLabel}`
-            : "Oscar-nominerad";
+            ? this._t("oscarNomineeCategory", { category: categoryLabel })
+            : this._t("oscarNominee");
       }
 
       return `
@@ -717,19 +825,19 @@ class MediaTrackerCard extends HTMLElement {
     let label;
     if (kind === "guldbagge") {
       label = isWinner
-        ? category ? `Guldbagge: ${category}` : "Guldbaggevinnare"
-        : "Guldbaggenominerad";
+        ? category ? `Guldbagge: ${category}` : this._t("guldbaggeWinner")
+        : this._t("guldbaggeNominee");
     } else if (kind === "palme") {
       label = isWinner
         ? String(category).toLowerCase() === "palme d'or"
-          ? "Guldpalmen"
-          : category ? `Cannes: ${category}` : "Cannesvinnare"
-        : "Cannesnominerad";
+          ? this._t("palmeDor")
+          : category ? `Cannes: ${category}` : this._t("cannesWinner")
+        : this._t("cannesNominee");
     } else {
       const organization = award.organization || award.source || "Award";
       label = isWinner
-        ? category ? `${organization}: ${category}` : `${organization}: vinnare`
-        : `${organization}: nominerad`;
+        ? category ? `${organization}: ${category}` : `${organization}: ${this._t("winner")}`
+        : `${organization}: ${this._t("nominee")}`;
     }
 
     return `
@@ -753,10 +861,10 @@ class MediaTrackerCard extends HTMLElement {
 
       return `
         <button class="action primary" data-action="episode-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+          <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
         </button>
         <button class="action" data-action="season-watched" data-index="${index}">
-          <ha-icon icon="mdi:check-all"></ha-icon><span>Säsong</span>
+          <ha-icon icon="mdi:check-all"></ha-icon><span>${this._t("season")}</span>
         </button>
       `;
     }
@@ -766,14 +874,14 @@ class MediaTrackerCard extends HTMLElement {
         ? this._releaseInfo(item)
         : `
           <button class="action primary" data-action="movie-watched" data-index="${index}">
-            <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+            <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
           </button>
         `;
 
       return `
         ${watchedAction}
         <button class="action" data-action="unfollow" data-index="${index}">
-          <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>Ta bort</span>
+          <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>${this._t("remove")}</span>
         </button>
       `;
     }
@@ -783,17 +891,17 @@ class MediaTrackerCard extends HTMLElement {
         ? ""
         : `
           <button class="action primary" data-action="watchlist" data-index="${index}">
-            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>${this._t("watchlist")}</span>
           </button>
         `;
 
       return `
         ${watchlistAction}
         <button class="action ${item.on_watchlist ? "primary" : ""}" data-action="movie-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+          <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
         </button>
         <button class="action" data-action="dismiss" data-index="${index}">
-          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+          <ha-icon icon="mdi:close"></ha-icon><span>${this._t("hide")}</span>
         </button>
       `;
     }
@@ -804,13 +912,13 @@ class MediaTrackerCard extends HTMLElement {
         : "movie-watched";
       return `
         <button class="action primary" data-action="watchlist" data-index="${index}">
-          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>${this._t("watchlist")}</span>
         </button>
         <button class="action" data-action="${watchedAction}" data-index="${index}">
-          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
+          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>${this._t("watched")}</span>
         </button>
         <button class="action" data-action="dismiss" data-index="${index}">
-          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+          <ha-icon icon="mdi:close"></ha-icon><span>${this._t("hide")}</span>
         </button>
       `;
     }
@@ -822,24 +930,24 @@ class MediaTrackerCard extends HTMLElement {
       const watchedAction = item.watched
         ? `
           <button class="action primary" data-action="movie-unwatched" data-index="${index}">
-            <ha-icon icon="mdi:check-circle"></ha-icon><span>Avmarkera sedd</span>
+            <ha-icon icon="mdi:check-circle"></ha-icon><span>${this._t("unmarkWatched")}</span>
           </button>
         `
         : `
           <button class="action" data-action="${watchedActionName}" data-index="${index}">
-            <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
+            <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>${this._t("watched")}</span>
           </button>
         `;
 
       return `
         ${item.watched ? "" : `
           <button class="action primary" data-action="watchlist" data-index="${index}">
-            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+            <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>${this._t("watchlist")}</span>
           </button>
         `}
         ${watchedAction}
         <button class="action" data-action="dismiss" data-index="${index}">
-          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+          <ha-icon icon="mdi:close"></ha-icon><span>${this._t("hide")}</span>
         </button>
       `;
     }
@@ -850,20 +958,20 @@ class MediaTrackerCard extends HTMLElement {
         : "movie-watched";
       return `
         <button class="action primary" data-action="watchlist" data-index="${index}">
-          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>Watchlist</span>
+          <ha-icon icon="mdi:bookmark-plus-outline"></ha-icon><span>${this._t("watchlist")}</span>
         </button>
         <button class="action" data-action="${watchedAction}" data-index="${index}">
-          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>Sedd</span>
+          <ha-icon icon="${item.media_type === "tv" ? "mdi:check-all" : "mdi:check"}"></ha-icon><span>${this._t("watched")}</span>
         </button>
         <button class="action" data-action="dismiss" data-index="${index}">
-          <ha-icon icon="mdi:close"></ha-icon><span>Dölj</span>
+          <ha-icon icon="mdi:close"></ha-icon><span>${this._t("hide")}</span>
         </button>
       `;
     }
 
     return `
       <button class="action primary" data-action="movie-watched" data-index="${index}">
-        <ha-icon icon="mdi:check"></ha-icon><span>Sedd</span>
+        <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
       </button>
     `;
   }
@@ -971,20 +1079,20 @@ class MediaTrackerCard extends HTMLElement {
     const provider = runtime.provider_filter || "all";
 
     const moods = [
-      ["all", "Alla"],
-      ["feelgood", "Feel-good"],
-      ["exciting", "Spännande"],
-      ["dark", "Mörkt"],
-      ["family", "Familj"],
-      ["romance", "Romantik"],
-      ["scifi_fantasy", "Sci-Fi/Fantasy"],
-      ["serious", "Seriöst"],
+      ["all", this._t("all")],
+      ["feelgood", this._t("feelgood")],
+      ["exciting", this._t("exciting")],
+      ["dark", this._t("dark")],
+      ["family", this._t("family")],
+      ["romance", this._t("romance")],
+      ["scifi_fantasy", this._t("scifiFantasy")],
+      ["serious", this._t("serious")],
     ];
 
     return `
       <div class="filters">
         <label class="filter-field">
-          <span>Humör</span>
+          <span>${this._t("mood")}</span>
           <select data-filter="mood_filter">
             ${moods
               .map(
@@ -996,10 +1104,10 @@ class MediaTrackerCard extends HTMLElement {
         </label>
 
         <label class="filter-field">
-          <span>Tjänster</span>
+          <span>${this._t("providers")}</span>
           <select data-filter="provider_filter">
-            <option value="all" ${provider === "all" ? "selected" : ""}>Alla</option>
-            <option value="my" ${provider === "my" ? "selected" : ""}>Mina</option>
+            <option value="all" ${provider === "all" ? "selected" : ""}>${this._t("all")}</option>
+            <option value="my" ${provider === "my" ? "selected" : ""}>${this._t("mine")}</option>
           </select>
         </label>
       </div>
@@ -1226,9 +1334,9 @@ class MediaTrackerCard extends HTMLElement {
 
         ${
           !state
-            ? `<div class="error">Entity ${this._escape(this._config.entity)} hittades inte.</div>`
+            ? `<div class="error">${this._escape(this._t("entityNotFound", { entity: this._config.entity }))}</div>`
             : items.length === 0
-              ? `<div class="empty">Inget att visa.</div>`
+              ? `<div class="empty">${this._t("empty")}</div>`
               : items.map((item, i) => this._renderItem(item, i)).join("")
         }
       </ha-card>
