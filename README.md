@@ -81,6 +81,36 @@ provider_filter: all
 max: 20
 ```
 
+## Example dashboard
+
+![Media Tracker Card dashboard with watchlist, discovery and award queues](images/media-tracker-card.png)
+
+This example uses several card instances in a four-column dashboard:
+
+- The left column contains the movie watchlist.
+- The second column contains three separate discovery queues.
+- The third column contains Best Picture queues for the Academy Awards and
+  Guldbaggen, followed by a combined **Any award organization** queue.
+- The right column aggregates the Hong Kong Film Awards' Best Action
+  Choreography category with discovery feeds centered on several well-known
+  Hong Kong action stars.
+
+The screenshot uses Home Assistant's Swedish localization; action and filter
+labels follow the language selected in Home Assistant.
+
+### TV series dashboard
+
+![Media Tracker Card dashboard with episode, TV discovery and award queues](images/media-tracker-card-series.png)
+
+This example shows three TV-oriented card flows side by side:
+
+- An episode queue with the next unwatched episode from each followed series.
+- A discovery profile for finding and following new TV series.
+- An award profile with nominated and winning TV series.
+
+Episode rows provide watched and season actions, while discovery and award
+rows can be added to the TV watchlist, marked as watched or hidden.
+
 ## Options
 
 | Option | Default | Description |
