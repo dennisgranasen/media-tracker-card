@@ -41,6 +41,7 @@ Every Media Watch entry provides these card feeds:
 - `sensor.media_watch_episodes` — the next unwatched episode of each followed
   TV series.
 - `sensor.media_watch_watchlist` — movies on the TMDB watchlist.
+- `sensor.media_watch_following_tv` — TV series on the TMDB watchlist.
 - One sensor per discovery profile, with an entity ID based on the profile ID,
   for example `sensor.media_watch_modern_horror`.
 
@@ -67,6 +68,16 @@ entity: sensor.media_watch_modern_horror
 title: Modern horror
 provider_filter: my
 show_filters: true
+max: 20
+```
+
+### TV watchlist example
+
+```yaml
+type: custom:media-tracker-card
+entity: sensor.media_watch_following_tv
+title: TV watchlist
+provider_filter: all
 max: 20
 ```
 
@@ -137,8 +148,9 @@ The available buttons depend on the feed and item:
 
 | Feed | Actions |
 |---|---|
-| Episode queue | **Watched** marks the episode watched. **Season** marks the displayed season watched after confirmation. |
+| Episode queue | **Watched** marks the episode watched. **Season** marks the displayed season watched after confirmation. **Remove** unfollows the TV series without changing watched progress. |
 | Movie watchlist | **Watched** marks the movie watched and removes it from the TMDB watchlist. **Remove** removes it without changing watched state. |
+| TV watchlist | **Remove** unfollows the series without changing watched progress. |
 | Discovery profile | **Watchlist**, **Watched** or **Hide**. A watched item instead offers **Unmark watched**. |
 
 To keep watched titles in a discovery profile and make **Unmark watched**
@@ -155,7 +167,8 @@ Progress is stored per episode. Future episodes in the same season and newly
 added seasons therefore remain unwatched and can later appear in the episode
 queue. Season 0 specials are not included.
 
-Unreleased episodes do not show watched actions; the air date is shown instead.
+Unreleased episodes do not show watched actions; the air date and **Remove**
+action are shown instead.
 Unreleased watchlist movies show the premiere date and retain only the
 **Remove** action until release day.
 

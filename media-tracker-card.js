@@ -1,5 +1,6 @@
 const CARD_VERSION = "1.0.0";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
+const TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500";
 
 const TRANSLATIONS = {
   en: {
@@ -263,9 +264,48 @@ class MediaTrackerCard extends HTMLElement {
     return presets[name] || presets.all;
   }
 
+  _followingTvItem(show) {
+    const nextEpisode =
+      show?.next_episode_to_watch ||
+      show?.next_episode_to_air ||
+      show?.next_episode ||
+      {};
+    const providers = show?.my_providers || show?.providers || [];
+
+    return {
+      media_type: "tv",
+      source: "tv_watchlist",
+      tmdb_id: show?.id ?? show?.tmdb_id,
+      title: show?.name || show?.title,
+      original_title: show?.original_name || show?.original_title,
+      poster: show?.poster || (
+        show?.poster_path
+          ? `${TMDB_POSTER_BASE}${show.poster_path}`
+          : null
+      ),
+      number: nextEpisode.code || "",
+      episode: nextEpisode.name || "",
+      airdate: nextEpisode.air_date || "",
+      providers,
+      provider: providers.join(", "),
+      provider_details:
+        show?.my_provider_details || show?.provider_details || [],
+      available_on_my_services:
+        show?.available_on_my_services === true,
+      watched: show?.watched === true,
+      deep_link:
+        show?.deep_link ||
+        `https://www.themoviedb.org/tv/${show?.id ?? show?.tmdb_id}`,
+    };
+  }
+
   _items() {
-    const items = this._state()?.attributes?.items;
-    if (!Array.isArray(items)) return [];
+    const attributes = this._state()?.attributes || {};
+    const items = Array.isArray(attributes.items)
+      ? attributes.items
+      : Array.isArray(attributes.shows)
+        ? attributes.shows.map((show) => this._followingTvItem(show))
+        : [];
 
     // Once Home Assistant confirms that an item is gone from this feed,
     // the optimistic suppression entry is no longer needed.
@@ -857,14 +897,29 @@ class MediaTrackerCard extends HTMLElement {
 
   _actions(item, index) {
     if (item.source === "episodes") {
-      if (this._isUnreleased(item)) return this._releaseInfo(item);
+      const progressActions = this._isUnreleased(item)
+        ? this._releaseInfo(item)
+        : `
+          <button class="action primary" data-action="episode-watched" data-index="${index}">
+            <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
+          </button>
+          <button class="action" data-action="season-watched" data-index="${index}">
+            <ha-icon icon="mdi:check-all"></ha-icon><span>${this._t("season")}</span>
+          </button>
+        `;
 
       return `
-        <button class="action primary" data-action="episode-watched" data-index="${index}">
-          <ha-icon icon="mdi:check"></ha-icon><span>${this._t("watched")}</span>
+        ${progressActions}
+        <button class="action" data-action="unfollow" data-index="${index}">
+          <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>${this._t("remove")}</span>
         </button>
-        <button class="action" data-action="season-watched" data-index="${index}">
-          <ha-icon icon="mdi:check-all"></ha-icon><span>${this._t("season")}</span>
+      `;
+    }
+
+    if (item.source === "tv_watchlist") {
+      return `
+        <button class="action primary" data-action="unfollow" data-index="${index}">
+          <ha-icon icon="mdi:bookmark-remove-outline"></ha-icon><span>${this._t("remove")}</span>
         </button>
       `;
     }
