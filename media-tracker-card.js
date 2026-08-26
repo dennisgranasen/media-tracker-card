@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.7.13";
+const CARD_VERSION = "1.0.0";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w92";
 
 class MediaTrackerCard extends HTMLElement {

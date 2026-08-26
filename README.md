@@ -1,14 +1,33 @@
 # Media Tracker Card
 
-A generic Lovelace card for
-[`home-assistant-media-tracker`](https://github.com/dennisgranasen/home-assistant-media-tracker).
+A Lovelace card for the
+[Media Watch](https://github.com/dennisgranasen/home-assistant-media-tracker)
+Home Assistant integration. It renders episode queues, movie watchlists and
+dynamic movie or TV discovery profiles from an entity's `items` attribute.
 
-Requires backend **v0.11.0+**.
+Media Watch **0.17.10 or later** is recommended so every card action, including
+marking only released TV episodes as watched, is available.
 
-Each card reads one entity with one `items` attribute. Use as many or as few
-cards as you want.
+## Installation
 
-## Episodes
+### HACS
+
+1. Open HACS and add
+   `https://github.com/dennisgranasen/media-tracker-card` as a custom repository
+   of type **Dashboard**.
+2. Install **Media Tracker Card**.
+3. Reload the browser after HACS has added or updated the resource.
+
+### Manual installation
+
+1. Copy `media-tracker-card.js` to `/config/www/media-tracker-card.js`.
+2. Add `/local/media-tracker-card.js` as a JavaScript module under
+   **Settings → Dashboards → Resources**.
+3. Reload the browser.
+
+## Basic configuration
+
+Add the card as a manual card. The only required option is `entity`:
 
 ```yaml
 type: custom:media-tracker-card
@@ -17,353 +36,138 @@ title: Nästa att se
 max: 10
 ```
 
-This is a watch queue. It shows the first locally unwatched episode from each
-followed show. A show with no progress starts at S01E01 even if a future
-season is already scheduled.
+Every Media Watch entry provides these card feeds:
 
-## Watchlist
+- `sensor.media_watch_episodes` — the next unwatched episode of each followed
+  TV series.
+- `sensor.media_watch_watchlist` — movies on the TMDB watchlist.
+- One sensor per discovery profile, with an entity ID based on the profile ID,
+  for example `sensor.media_watch_modern_horror`.
 
-Show the complete TMDB movie watchlist:
+The actual entity ID can differ if Home Assistant resolves a naming conflict.
+Check **Developer tools → States** if in doubt. Current Media Watch versions do
+not create fixed global Discovery, Personalized or Oscars sensors; those feeds
+are configured as discovery profiles in the integration.
+
+### Watchlist example
 
 ```yaml
 type: custom:media-tracker-card
 entity: sensor.media_watch_watchlist
 title: Watchlist
-provider_filter: all
-```
-
-Show only watchlist movies currently available on one of your selected
-streaming services:
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_watchlist
-title: Watchlist på mina tjänster
 provider_filter: my
+poster_width: 140
 ```
 
-The **Sedd** action marks the movie watched and removes it from the TMDB
-watchlist.
-
-Use **Ta bort** to remove a movie from the TMDB watchlist without marking it
-as watched.
-
-## Discovery
-
-All discovery results available on streaming services in your configured
-region:
+### Discovery profile example
 
 ```yaml
 type: custom:media-tracker-card
-entity: sensor.media_watch_discovery
-title: Filmtips
-provider_filter: all
+entity: sensor.media_watch_modern_horror
+title: Modern skräck
+provider_filter: my
+show_filters: true
 max: 20
 ```
 
-Only discoveries available on your selected services:
+## Options
+
+| Option | Default | Description |
+|---|---:|---|
+| `entity` | required | Sensor whose `items` attribute the card renders. |
+| `title` | empty | Heading shown above the list. |
+| `max` | `10` | Maximum number of visible rows. |
+| `hide_empty` | `false` | Hide the complete card when the feed is empty. |
+| `poster_width` | `120` | Poster width in pixels, clamped to 78–220 and reduced responsively on narrow cards. |
+| `date_format` | `short` | Date format: `short`, `long` or `iso`. |
+| `show_provider_name` | `false` | Show provider names next to provider logos. |
+| `provider_icon_size` | `26` | Provider logo size in pixels. |
+| `provider_filter` | `all` | `all` shows every item; `my` requires `available_on_my_services: true`. |
+| `include_genres` | `[]` | Only show items matching these TMDB genre names or IDs. |
+| `exclude_genres` | `[]` | Hide items matching these TMDB genre names or IDs. Exclusion always wins. |
+| `genre_match` | `any` | `any` or `all` for matching `include_genres`. |
+| `show_filters` | `false` | Show interactive mood and provider selectors in the card. |
+| `mood_filter` | `all` | Initial mood: `all`, `feelgood`, `exciting`, `dark`, `family`, `romance`, `scifi_fantasy` or `serious`. |
+
+All filters in the card are presentation filters. They do not change the
+discovery profile or TMDB watchlist. Interactive selections are local to the
+rendered card and reset to the YAML values when the dashboard reloads.
+
+Genre filters can use localized names:
 
 ```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_discovery
-title: Filmtips på mina tjänster
-provider_filter: my
-max: 20
-```
-
-Discovery provides:
-
-- **Watchlist** — adds the movie to the TMDB watchlist. After refresh it
-  disappears from Discovery and appears in Watchlist.
-- **Sedd**
-- **Dölj**
-
-## Provider filter
-
-`provider_filter` supports:
-
-- `all` — do not filter the feed by your subscriptions.
-- `my` — require `available_on_my_services: true`.
-
-The filter only changes what the card displays. It does not alter the TMDB
-watchlist or your selected provider settings.
-
-## Shared options
-
-```yaml
-show_provider_name: false
-provider_icon_size: 28
-poster_width: 120
-date_format: short
-hide_empty: false
-```
-
-Provider logos come from TMDB watch-provider metadata.
-
-This product uses the TMDB API but is not endorsed or certified by TMDB.
-Watch-provider metadata is powered by JustWatch.
-
-
-## Oscars
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_oscars
-title: Oscars
-provider_filter: all
-max: 10
-```
-
-Or only Oscar films currently available on one of your services:
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_oscars
-title: Oscars på mina tjänster
-provider_filter: my
-max: 10
-```
-
-The latest Best Picture winner is shown with a **Vinnare** badge; the remaining
-Best Picture films show **Nominerad**.
-
-Oscar feed actions:
-
-- **Watchlist** (unless already on your TMDB watchlist)
-- **Sedd**
-- **Dölj**
-
-
-## Genre filtering
-
-Genre filters work on discovery and personalized feeds for both movies and TV.
-
-Include one or more genres by localized TMDB name:
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_discovery
-title: Sci-fi och fantasy
 include_genres:
   - Science Fiction
   - Fantasy
+exclude_genres:
+  - Horror
 genre_match: any
 ```
 
-Or by TMDB genre IDs:
+or TMDB IDs, which do not depend on the profile language:
 
 ```yaml
 include_genres:
   - 878
   - 14
-genre_match: any
+genre_match: all
 ```
 
-Exclude genres:
+## Information shown on the card
 
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_discovery
-title: Filmtips utan skräck
-exclude_genres:
-  - Horror
-```
+When the sensor provides the corresponding metadata, movie rows show:
 
-`genre_match: all` requires every included genre; `any` (default) requires at
-least one. Exclusion always wins.
-
-## Personalized movies
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_personalized_movies
-title: För dig
-provider_filter: my
-max: 20
-```
-
-This feed aggregates TMDB recommendations from both your current movie
-watchlist and movies marked watched in Media Watch.
-
-## TV discovery
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_discovery_tv
-title: Serietips
-provider_filter: my
-max: 20
-```
-
-The same rating/provider model used for general movie discovery is applied to
-TV shows.
-
-## Personalized TV
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_personalized_tv
-title: Serier för dig
-provider_filter: my
-max: 20
-```
-
-Seeds are followed/watchlisted TV shows plus shows marked watched locally.
-
-
-## Interactive mood filters
-
-Set:
-
-```yaml
-show_filters: true
-```
-
-to expose interactive filters directly in the card:
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_discovery
-title: Vad ska vi se?
-show_filters: true
-provider_filter: my
-max: 20
-```
-
-The user can then change:
-
-- **Humör**: Alla, Feel-good, Spännande, Mörkt, Familj, Romantik,
-  Sci-Fi/Fantasy, Seriöst
-- **Tjänster**: Alla or Mina
-
-Mood presets combine genre inclusion/exclusion with a small rating floor.
-They are applied on top of any static YAML `include_genres` /
-`exclude_genres`.
-
-The filter state is local to the rendered card and is not persisted to Home
-Assistant. Reloading the dashboard resets it to the YAML defaults.
-
-
-### v0.7.1 mood filter fix
-
-Mood presets now use TMDB genre IDs instead of localized genre names. This
-makes interactive mood filtering independent of the TMDB profile language.
-
-Movie and TV feeds use their respective TMDB genre taxonomies.
-
-
-### v0.7.2 optimistic actions
-
-Actions that normally remove an item from the current feed update the card
-immediately:
-
-- episode watched
-- season watched
-- movie/TV watched
-- add discovery/personalized item to watchlist
-- dismiss
-
-The Home Assistant service call then runs normally. If it fails, the item is
-restored in the card. This avoids making the UI wait for a full Media Watch
-coordinator refresh.
-
-
-### v0.7.3 episode queue and flicker fix
-
-- Episode and season watched actions no longer optimistically hide the series.
-  The row stays visible while the action runs and advances to the next unwatched
-  episode when the backend feed updates.
-- Optimistic hiding remains enabled for movie/discovery actions that genuinely
-  remove the item from the current feed.
-- The card no longer rebuilds its DOM for unrelated Home Assistant state
-  updates; it only re-renders when its configured entity changes or when a
-  local card filter/configuration changes.
-
-
-### v0.7.4 discovery profiles
-
-Dynamic discovery-profile sensors from Media Watch v0.13.0 use the same card:
-
-```yaml
-type: custom:media-tracker-card
-entity: sensor.media_watch_<your_profile_entity>
-title: My queue
-show_filters: true
-```
-
-Profile items support Watchlist, Watched and Dismiss actions.
-
-Profiles whose **Exclude watched titles** option is disabled also include
-watched films. Their checked **Avmarkera sedd** action calls
-`media_watch.mark_unwatched`, so the local watched marker can be removed again.
-
-
-### v0.7.5 historical award metadata
-
-Award-profile items can show aggregate Oscar metadata, for example
-`2 Oscars · 7 nom.`. The same generic Media Tracker Card is used for dynamic
-award discovery profiles.
-
-
-### v0.7.6 award ordering and winner details
-
-- Award-profile items are ordered from the newest award year to the oldest.
-- Oscar winners are detected from both current and legacy Media Watch metadata.
-  When a single winning category is available, the badge names it, for example
-  `Oscar för bästa film`.
-- Watched profile items can be unmarked directly in the card when the profile
-  is configured to include watched titles.
-- Movie rows show the release year, director and up to three leading cast
-  members when supplied by the Media Watch sensor.
-
-
-### v0.7.7 split credits and person awards
-
-- Leading cast is shown on its own line, followed by `Regi:` on a separate
+- Poster, title, release year and TMDB rating.
+- Up to three leading actors, followed by the director on a separate `Regi:`
   line.
-- A trophy is shown directly after an actor or director when Oscar metadata
-  identifies that person as the winner for the film.
+- Streaming-provider logos and optionally their names.
+- Award badges, nominations and wins.
 
+Award-profile items are ordered by award year, newest first. Oscar, Cannes and
+Guldbaggen wins use distinct statuette, palm and beetle symbols. Other award
+organizations use a generic trophy. An actor or director also gets an award
+symbol after their name when the sensor identifies that person as a winner.
 
-### v0.7.8 larger configurable posters
+Award details come from Media Watch's award sources, not TMDB. TMDB supplies
+the movie/TV metadata, credits, ratings and watch-provider information.
 
-Movie posters are 120 pixels wide by default. Set `poster_width` between 78
-and 220 to choose another size; the card preserves the poster's 2:3 ratio and
-limits its width responsively on narrow screens.
+## Actions and watched state
 
+The available buttons depend on the feed and item:
 
-### v0.7.9 remove from watchlist
+| Feed | Actions |
+|---|---|
+| Episode queue | **Sedd** marks the episode watched. **Säsong** marks the displayed season watched after confirmation. |
+| Movie watchlist | **Sedd** marks the movie watched and removes it from the TMDB watchlist. **Ta bort** removes it without changing watched state. |
+| Discovery profile | **Watchlist**, **Sedd** or **Dölj**. A watched item instead offers **Avmarkera sedd**. |
 
-Watchlist rows have a separate **Ta bort** action that calls
-`media_watch.unfollow` without changing the movie's local watched state.
+To keep watched titles in a discovery profile and make **Avmarkera sedd**
+available, disable **Exclude watched titles** in that profile under
+**Settings → Devices & services → Media Watch → Configure → Discovery
+profiles**.
 
+For a TV series in a discovery profile, **Sedd**:
 
-### v0.7.10 award-specific symbols
+1. Marks only regular episodes with an air date of today or earlier as watched.
+2. Adds the show to the TV watchlist so it remains followed.
 
-- Oscars use a stylized statuette, Cannes uses a golden palm and Guldbaggen
-  uses a golden beetle instead of sharing one generic trophy.
-- Profiles containing several award organizations render one badge per source,
-  so an Oscar nomination cannot be confused with a Guldbagge win.
+Progress is stored per episode. Future episodes in the same season and newly
+added seasons therefore remain unwatched and can later appear in the episode
+queue. Season 0 specials are not included.
 
+Unreleased episodes do not show watched actions; the air date is shown instead.
+Unreleased watchlist movies show the premiere date and retain only the
+**Ta bort** action until release day.
 
-### v0.7.11 unreleased media actions
+Actions update the card immediately when appropriate. If the Home Assistant
+service call fails, the item is restored and an error is shown.
 
-- Future watchlist movies show their premiere date instead of **Sedd**, while
-  **Ta bort** remains available.
-- Future episode rows show their air date instead of watched/season actions.
-  Watched actions become available on the release date.
+## Troubleshooting
 
+See [troubleshooting.md](troubleshooting.md) for cache, resource, sensor and
+service-call checks to perform before opening an issue.
 
-### v0.7.12 watched TV discovery action
+## Data attribution
 
-Using **Sedd** on a TV discovery/profile row records watched progress and then
-follows the show through `media_watch.follow`. See v0.7.13 for the
-released-episode behavior used by the current card.
-
-
-### v0.7.13 released episodes only
-
-The TV discovery **Sedd** action now calls
-`media_watch.mark_released_episodes_watched`. Already aired episodes are
-marked individually, so later episodes in the same season and new seasons
-remain unwatched and can appear in the episode queue.
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+Watch-provider metadata is powered by JustWatch.

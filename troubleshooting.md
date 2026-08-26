@@ -1,52 +1,65 @@
-# Troubleshooting:
-### Follow the instructions below before posting an issue or asking for help on the forums. Be sure to indicate that you tried these steps and report your findings.
+# Troubleshooting
 
-## Card:
+## The card is not available
 
-* Whitelist your HA page in your adblocker, some ad blocking extensions are over cautious and will block any image with certain words in the url, like "banner".
+If Home Assistant reports that `custom:media-tracker-card` does not exist:
 
-* Make sure the card is not contained inside another card in your ui-lovelace.yaml. This will help rule out issues or conflicts with the containing card.
+1. Confirm that HACS installed `media-tracker-card.js`, or that the manual file
+   exists at `/config/www/media-tracker-card.js`.
+2. Under **Settings → Dashboards → Resources**, confirm that
+   `/hacsfiles/media-tracker-card/media-tracker-card.js` (HACS) or
+   `/local/media-tracker-card.js` (manual installation) is loaded as a
+   JavaScript module.
+3. Reload the dashboard without using the browser cache. Restart the Home
+   Assistant companion app if it still has the old resource cached.
 
-* Clear your browser's cache and make sure you're editing the version number in the resources section of ui-lovelace.yaml if you don't use HACS.
+The browser console should contain a `MEDIA-TRACKER-CARD` line with the loaded
+version.
 
-* Check that you installed the custom components & they are working correctly (more on components below). This card only works with the custom components linked at the top of the [readme](https://github.com/custom-cards/upcoming-media-card/blob/master/README.md).
+## The entity is missing or the card is empty
 
-## Components:
+Open **Developer tools → States** and inspect the entity configured in the
+card. It must exist and expose an `items` attribute containing a list.
 
-* Check that the components are reporting data. You can find this in your HA sidebar under developer tools. Click
-the icon that looks like this <> or select "states" at the top. To help with troubleshooting always mention what you see here next to your sensor ("sensor.sonarr_upcoming_media", for example).
+Core card feeds normally include:
 
-* "sensor.sonarr_upcoming" & "sensor.radarr_upcoming" are not the components for this card, they are the default HA components. The Sonarr and Radarr components for this card end in "media" and the links for them are in the [readme](https://github.com/custom-cards/upcoming-media-card/blob/master/README.md).
+- `sensor.media_watch_episodes`
+- `sensor.media_watch_watchlist`
+- A sensor generated for each Media Watch discovery profile
 
-* Try the default Home Assistant components for the service you are using to see if they're working. If they are having issues as well it is a good indication that there are issues with the service and not the components.
+Home Assistant may append a suffix when an entity ID already exists. Use the
+actual ID shown in Developer tools. Dynamic profile sensors are created under
+**Settings → Devices & services → Media Watch → Configure → Discovery
+profiles**.
 
-Below are some links to try in your browser to test your connection and API needed for the components.
-If you do not get any info from the links below, one or more of the following may be true:
+An empty feed can also be correct. Check the profile's provider, watched,
+genre, rating and release filters in the Media Watch integration. Card-level
+`provider_filter`, `include_genres`, `exclude_genres` and `mood_filter` can
+further reduce what is displayed. Temporarily remove those options or set
+`provider_filter: all` and `mood_filter: all` when diagnosing the result.
 
-* There are issues with the service that you are using
-* IP, SSL, port, api key, or token may be incorrect.
-* There are no items to report in your set time frame.
+## Posters or provider logos are missing
 
-These are not issues related to the card or components and need addressed with the service you are using.
+The images are loaded from TMDB. Check that the browser, DNS filter and ad
+blocker allow `image.tmdb.org`. Provider information also depends on the
+region and provider metadata returned by Media Watch.
 
-## Radarr & Sonarr:
-Use the IP and port of your
-Radarr or Sonarr server.
-`````
-http(s)://[IP]:[port]/api/calendar?apikey=[API_key]&start=[start_date]&end=[end_date]
-`````
-For start and end date use "YYYY-MM-DD" format like so: "2018-09-31"
-Start date should be todays date and end date should be as far into the future as you set the component. </br></br>
-**Example:**
-`````
-https://192.168.1.2:7878/api/calendar?apikey=yOuRApiKEyg03sheRE&start=2018-10-31&end=2019-05-15
-`````
-## Plex:
-Use the IP and port of your Plex server.
-`````
-http(s)://[IP]:[port]/library/recentlyAdded?X-Plex-Token=[token]
-`````
-**Example:**
-`````
-http://192.168.1.2:32400/library/recentlyAdded?X-Plex-Token=yOuRPLexT0keng03sheRE
-`````
+## A button fails
+
+Card buttons call `media_watch` actions. Check **Settings → System → Logs** for
+the underlying error and make sure Media Watch is up to date. The TV discovery
+**Sedd** action requires Media Watch 0.17.10 or later because it uses
+`media_watch.mark_released_episodes_watched`.
+
+You can verify that an action is registered under **Developer tools →
+Actions**. Confirm that the TMDB authentication used by Media Watch is still
+valid if watchlist actions fail.
+
+## Information to include in a bug report
+
+- Media Tracker Card, Media Watch and Home Assistant versions.
+- The complete card YAML.
+- One relevant item from the sensor's `items` attribute, with private data
+  removed.
+- Browser-console and Home Assistant log errors.
+- A screenshot when the problem is visual.
