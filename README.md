@@ -188,6 +188,18 @@ as provided.
 See [troubleshooting.md](troubleshooting.md) for cache, resource, sensor and
 service-call checks to perform before opening an issue.
 
+## AI-assisted development
+
+This project was developed with assistance from
+[OpenAI Codex](https://developers.openai.com/). Codex was used to help design,
+implement, review, test and document the code. The original artwork for
+[`brand/icon.png`](brand/icon.png) was generated using image-generation tooling
+through Codex and prepared for HACS in this repository.
+
+All AI-assisted output was directed and reviewed by the maintainer, who remains
+responsible for the final code and published assets. This is an independent
+project and is not sponsored, endorsed or certified by OpenAI.
+
 ## Data attribution
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
